@@ -6,10 +6,15 @@ from accounts.views import (
     ThrottledTokenRefreshView,
 )
 
+from config.health import health, readiness
+
 
 urlpatterns = [
+
+    path("health/", health, name="health"),
+    path("ready/", readiness, name="readiness"),
     path("admin/", admin.site.urls),
-   path(
+    path(
     "api/token/",
     ThrottledTokenObtainPairView.as_view(),
     name="token-obtain-pair",
