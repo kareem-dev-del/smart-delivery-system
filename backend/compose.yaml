@@ -24,6 +24,17 @@ services:
       retries: 10
       start_period: 5s
 
+  redis:
+    image: redis:8.10.2-alpine
+    container_name: smart-delivery-redis
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   web:
     build:
       context: .
@@ -35,6 +46,7 @@ services:
       - .env
     environment:
       POSTGRES_HOST: db
+      REDIS_URL: redis://redis:6379/0
     volumes:
       - .:/app
     ports:
@@ -53,6 +65,8 @@ services:
       start_period: 20s
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     restart: unless-stopped
 

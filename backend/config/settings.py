@@ -120,6 +120,31 @@ else:
 
 
 # Password validation
+REDIS_URL = os.getenv("REDIS_URL")
+CACHE_DEFAULT_TIMEOUT = int(
+    os.getenv("CACHE_DEFAULT_TIMEOUT", "300")
+)
+
+if REDIS_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": REDIS_URL,
+            "TIMEOUT": CACHE_DEFAULT_TIMEOUT,
+            "KEY_PREFIX": "smart_delivery",
+        }
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": (
+                "django.core.cache.backends.locmem.LocMemCache"
+            ),
+            "LOCATION": "smart-delivery-local",
+            "TIMEOUT": CACHE_DEFAULT_TIMEOUT,
+            "KEY_PREFIX": "smart_delivery",
+        }
+    }
 # https://docs.djangoproject.com/en/6.1/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
