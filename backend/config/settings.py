@@ -182,6 +182,19 @@ CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_IGNORE_RESULT = True
 
 
+
+CELERY_ORDER_EXPIRATION_INTERVAL_SECONDS = int(
+    os.getenv("CELERY_ORDER_EXPIRATION_INTERVAL_SECONDS", "300")
+)
+
+CELERY_BEAT_SCHEDULE = {
+    "expire-overdue-orders": {
+        "task": "orders.tasks.expire_overdue_orders_task",
+        "schedule": CELERY_ORDER_EXPIRATION_INTERVAL_SECONDS,
+    },
+}
+
+
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 

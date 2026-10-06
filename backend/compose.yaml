@@ -93,6 +93,26 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  celery-beat:
+    build:
+      context: .
+    container_name: smart-delivery-celery-beat
+    command: celery -A config beat --loglevel=INFO --schedule=/tmp/celerybeat-schedule --pidfile=/tmp/celerybeat.pid
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: db
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   smart_delivery_postgres_data:
     external: true
