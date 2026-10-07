@@ -26,5 +26,8 @@ class NotificationSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class NotificationMarkAllReadResponseSerializer(serializers.Serializer):
+    updated_count = serializers.IntegerField(read_only=True)
+
 class NotificationListFilterSerializer(serializers.Serializer):
     unread = serializers.BooleanField(required=False)

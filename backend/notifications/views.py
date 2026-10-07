@@ -9,11 +9,13 @@ from .pagination import NotificationPagination
 from .serializers import (
     NotificationListFilterSerializer,
     NotificationSerializer,
+    NotificationMarkAllReadResponseSerializer,
 )
 from .services import (
     mark_all_notifications_as_read,
     mark_notification_as_read,
 )
+from drf_spectacular.utils import extend_schema
 
 
 class NotificationListAPIView(generics.ListAPIView):
@@ -40,7 +42,11 @@ class NotificationListAPIView(generics.ListAPIView):
 
         return queryset
 
-
+@extend_schema(
+    tags=["Notifications"],
+    request=None,
+    responses={status.HTTP_200_OK: NotificationSerializer},
+)
 class NotificationMarkReadAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -59,7 +65,13 @@ class NotificationMarkReadAPIView(APIView):
             headers={"Cache-Control": "no-store"},
         )
 
-
+@extend_schema(
+    tags=["Notifications"],
+    request=None,
+    responses={
+        status.HTTP_200_OK: NotificationMarkAllReadResponseSerializer,
+    },
+)
 class NotificationMarkAllReadAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
