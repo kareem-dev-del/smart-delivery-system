@@ -50,6 +50,12 @@ class AccountProfileSerializer(serializers.ModelSerializer):
         )
 
 
+class AuthenticationResponseSerializer(serializers.Serializer):
+    user = AccountProfileSerializer(read_only=True)
+    access = serializers.CharField(read_only=True)
+    refresh = serializers.CharField(read_only=True)
+
+
 class CustomerRegistrationSerializer(serializers.Serializer):
     username = serializers.CharField(
         min_length=3,

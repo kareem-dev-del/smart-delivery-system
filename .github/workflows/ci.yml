@@ -1,0 +1,48 @@
+name: Backend CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Check out source code
+        uses: actions/checkout@v4
+
+      - name: Create CI environment file
+        run: cp .env.example .env
+
+      - name: Validate Docker Compose configuration
+        run: docker compose config --quiet
+
+      - name: Create CI database volume
+        run: docker volume create smart_delivery_postgres_data
+
+
+      - name: Start database and Redis
+        run: docker compose up -d --build db redis
+
+      - name: Validate OpenAPI schema
+        run: >
+          docker compose run --rm --no-deps web
+          python manage.py spectacular
+          --file /tmp/openapi.yaml
+          --validate
+          --fail-on-warn
+
+      - name: Run test suite
+        run: >
+          docker compose run --rm --no-deps web
+          python manage.py test
+          --settings=config.test_settings
+
+      - name: Clean up CI containers
+        if: always()
+        run: docker compose down -v

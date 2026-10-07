@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.core.exceptions import ValidationError as DjangoValidationError
+from drf_spectacular.utils import extend_schema, extend_schema_view
 
 from .serializers import (
     AccountProfileSerializer,
@@ -11,6 +12,7 @@ from .serializers import (
     CustomerRegistrationSerializer,
     ChangePasswordSerializer,
     LogoutSerializer,
+    AuthenticationResponseSerializer,
 )
 
 from rest_framework_simplejwt.views import (
@@ -36,10 +38,17 @@ class ThrottledTokenObtainPairView(TokenObtainPairView):
 class ThrottledTokenRefreshView(TokenRefreshView):
     throttle_classes = [AuthenticationRateThrottle]
 
+
+@extend_schema(
+    tags=["Accounts"],
+    request=CustomerRegistrationSerializer,
+    responses={status.HTTP_201_CREATED: AuthenticationResponseSerializer},
+)
+
 class CustomerRegistrationAPIView(APIView):
     permission_classes = [AllowAny]
     throttle_classes = [AuthenticationRateThrottle]
-    
+
 
     def post(self, request):
         serializer = CustomerRegistrationSerializer(data=request.data)
@@ -59,7 +68,17 @@ class CustomerRegistrationAPIView(APIView):
             headers={"Cache-Control": "no-store"},
         )
 
-
+@extend_schema_view(
+    get=extend_schema(
+        tags=["Accounts"],
+        responses={status.HTTP_200_OK: AccountProfileSerializer},
+    ),
+    patch=extend_schema(
+        tags=["Accounts"],
+        request=AccountProfileUpdateSerializer,
+        responses={status.HTTP_200_OK: AccountProfileSerializer},
+    ),
+)
 class MyAccountAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -84,7 +103,11 @@ class MyAccountAPIView(APIView):
             status=status.HTTP_200_OK,
         )
 
-
+@extend_schema(
+    tags=["Accounts"],
+    request=ChangePasswordSerializer,
+    responses={status.HTTP_200_OK: AuthenticationResponseSerializer},
+)
 class ChangePasswordAPIView(APIView):
     permission_classes = [IsAuthenticated]
     throttle_classes = [PasswordChangeRateThrottle]
@@ -111,7 +134,11 @@ class ChangePasswordAPIView(APIView):
             headers={"Cache-Control": "no-store"},
         )
 
-
+@extend_schema(
+    tags=["Accounts"],
+    request=LogoutSerializer,
+    responses={status.HTTP_205_RESET_CONTENT: None},
+)
 class LogoutAPIView(APIView):
     permission_classes = [IsAuthenticated]
 

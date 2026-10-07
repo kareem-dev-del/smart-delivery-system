@@ -6,6 +6,11 @@ from rest_framework.test import APITestCase
 from accounts.models import UserProfile
 from .models import Product
 
+
+from django.core.cache import cache
+
+from .cache import ACTIVE_PRODUCT_LIST_CACHE_KEY
+
 User = get_user_model()
 
 
@@ -43,6 +48,51 @@ class ProductAPITests(APITestCase):
             size=Product.Size.SMALL,
             is_active=False,
         )
+
+
+        cache.delete(ACTIVE_PRODUCT_LIST_CACHE_KEY)
+        self.addCleanup(
+            cache.delete,
+            ACTIVE_PRODUCT_LIST_CACHE_KEY,
+        )
+    def test_active_product_list_is_cached(self):
+        response = self.client.get(
+            reverse("product-list-create")
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            cache.get(ACTIVE_PRODUCT_LIST_CACHE_KEY),
+            response.data,
+        )
+
+    def test_product_save_invalidates_cached_list(self):
+        self.client.get(reverse("product-list-create"))
+
+        self.assertIsNotNone(
+            cache.get(ACTIVE_PRODUCT_LIST_CACHE_KEY)
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.active_product.stock = 7
+            self.active_product.save(
+                update_fields=("stock", "updated_at")
+            )
+
+        self.assertIsNone(
+            cache.get(ACTIVE_PRODUCT_LIST_CACHE_KEY)
+        )
+
+        response = self.client.get(
+            reverse("product-list-create")
+        )
+        active_product = next(
+            product
+            for product in response.data
+            if product["id"] == self.active_product.id
+        )
+
+        self.assertEqual(active_product["stock"], 7)              
 
     def test_anyone_can_list_active_products(self):
         response = self.client.get(reverse("product-list-create"))

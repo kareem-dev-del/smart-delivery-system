@@ -50,6 +50,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
      'rest_framework',
+     "drf_spectacular",
+     "drf_spectacular_sidecar",
      "rest_framework_simplejwt.token_blacklist",
      "accounts.apps.AccountsConfig",
      "products.apps.ProductsConfig",
@@ -120,6 +122,31 @@ else:
 
 
 # Password validation
+REDIS_URL = os.getenv("REDIS_URL")
+CACHE_DEFAULT_TIMEOUT = int(
+    os.getenv("CACHE_DEFAULT_TIMEOUT", "300")
+)
+
+if REDIS_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": REDIS_URL,
+            "TIMEOUT": CACHE_DEFAULT_TIMEOUT,
+            "KEY_PREFIX": "smart_delivery",
+        }
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": (
+                "django.core.cache.backends.locmem.LocMemCache"
+            ),
+            "LOCATION": "smart-delivery-local",
+            "TIMEOUT": CACHE_DEFAULT_TIMEOUT,
+            "KEY_PREFIX": "smart_delivery",
+        }
+    }
 # https://docs.djangoproject.com/en/6.1/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
@@ -148,6 +175,26 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 
 USE_TZ = True
+
+CELERY_BROKER_URL = os.getenv(
+    "CELERY_BROKER_URL",
+    "redis://127.0.0.1:6379/1",
+)
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_IGNORE_RESULT = True
+
+
+
+CELERY_ORDER_EXPIRATION_INTERVAL_SECONDS = int(
+    os.getenv("CELERY_ORDER_EXPIRATION_INTERVAL_SECONDS", "300")
+)
+
+CELERY_BEAT_SCHEDULE = {
+    "expire-overdue-orders": {
+        "task": "orders.tasks.expire_overdue_orders_task",
+        "schedule": CELERY_ORDER_EXPIRATION_INTERVAL_SECONDS,
+    },
+}
 
 
 # Static files (CSS, JavaScript, Images)
@@ -189,6 +236,43 @@ REST_FRAMEWORK = {
         "30/minute",
     ),
   },
+  "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+}
+
+
+
+
+
+API_DOCUMENTATION_ENABLED = os.getenv(
+    "API_DOCUMENTATION_ENABLED",
+    str(DEBUG),
+).lower() == "true"
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Smart Delivery System API",
+    "DESCRIPTION": (
+        "Backend API for orders, smart lockers, couriers, "
+        "and customer pickup workflows."
+    ),
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "COMPONENT_SPLIT_REQUEST": True,
+    "SWAGGER_UI_DIST": "SIDECAR",
+    "SWAGGER_UI_FAVICON_HREF": "SIDECAR",
+    "SWAGGER_UI_SETTINGS": {
+        "deepLinking": True,
+        "displayOperationId": True,
+        "persistAuthorization": False,
+    },
+
+    "ENUM_NAME_OVERRIDES": {
+    "OrderStatusEnum": "orders.models.Order.Status",
+    "LockerStationStatusEnum": (
+        "lockers.models.LockerStation.Status"
+    ),
+    "DrawerStatusEnum": "lockers.models.Drawer.Status",
+    "PackageSizeEnum": "products.models.Product.Size",
+   },
 }
 
 SIMPLE_JWT = {

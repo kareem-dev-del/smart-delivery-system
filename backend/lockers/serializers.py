@@ -225,12 +225,15 @@ class AdminLockerDeviceSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         )
-
-    def get_connection_status(self, locker_device):
+    def get_connection_status(
+        self,
+        locker_device: LockerDevice,
+    ) -> str:
         return get_locker_device_connection_status(
             locker_device=locker_device,
             now=self.context.get("now"),
-        )   
+        )
+
 
 class AdminDashboardSummarySerializer(serializers.Serializer):
     generated_at = serializers.DateTimeField(read_only=True)

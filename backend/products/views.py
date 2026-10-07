@@ -8,6 +8,12 @@ from .models import Product
 from .serializers import ProductSerializer
 
 
+from django.core.cache import cache
+from rest_framework.response import Response
+
+from .cache import ACTIVE_PRODUCT_LIST_CACHE_KEY
+
+
 class ProductListCreateAPIView(generics.ListCreateAPIView):
     serializer_class = ProductSerializer
 
@@ -24,6 +30,24 @@ class ProductListCreateAPIView(generics.ListCreateAPIView):
             return [IsAdminRole()]
 
         return [AllowAny()]
+
+
+    def list(self, request, *args, **kwargs):
+        cached_products = cache.get(
+            ACTIVE_PRODUCT_LIST_CACHE_KEY
+        )
+
+        if cached_products is not None:
+            return Response(cached_products)
+
+        response = super().list(request, *args, **kwargs)
+
+        cache.set(
+            ACTIVE_PRODUCT_LIST_CACHE_KEY,
+            response.data,
+        )
+
+        return response   
 
 
 class ProductRetrieveUpdateAPIView(generics.RetrieveUpdateAPIView):

@@ -7,6 +7,7 @@ from .services import (
     get_admin_dashboard_summary,
     set_locker_device_active,
 )
+from drf_spectacular.utils import extend_schema
 
 from django.utils import timezone
 
@@ -165,6 +166,15 @@ class AdminDrawerMaintenanceStatusAPIView(generics.GenericAPIView):
             status=status.HTTP_200_OK,
         )
 
+
+
+@extend_schema(
+    tags=["Locker Administration"],
+    request=LockerDeviceProvisionSerializer,
+    responses={
+        status.HTTP_201_CREATED: LockerDeviceProvisionResponseSerializer,
+    },
+)
 class AdminLockerDeviceProvisionAPIView(APIView):
     permission_classes = [IsAdminRole]
 
@@ -238,6 +248,15 @@ class LockerStationRetrieveAPIView(generics.RetrieveAPIView):
 
         return queryset
 
+
+
+@extend_schema(
+    tags=["Locker Device"],
+    request=PickupQRScanSerializer,
+    responses={
+        status.HTTP_200_OK: OpenDrawerAuthorizationSerializer,
+    },
+)
 class LockerPickupScanAPIView(APIView):
     permission_classes = [IsLockerDevice]
     throttle_classes = [LockerQRScanRateThrottle]
@@ -274,6 +293,14 @@ class LockerPickupScanAPIView(APIView):
         )  
 
 
+
+@extend_schema(
+    tags=["Locker Device"],
+    request=PickupQRScanSerializer,
+    responses={
+        status.HTTP_200_OK: OpenDrawerAuthorizationSerializer,
+    },
+)
 class LockerReturnScanAPIView(APIView):
     permission_classes = [IsLockerDevice]
     throttle_classes = [LockerQRScanRateThrottle]
@@ -310,6 +337,14 @@ class LockerReturnScanAPIView(APIView):
         )      
 
 
+
+@extend_schema(
+    tags=["Locker Device"],
+    request=None,
+    responses={
+        status.HTTP_200_OK: CollectionConfirmationResponseSerializer,
+    },
+)
 class LockerCollectionConfirmationAPIView(APIView):
     permission_classes = [IsLockerDevice]
 
@@ -344,6 +379,15 @@ class LockerCollectionConfirmationAPIView(APIView):
         )
 
 
+
+
+@extend_schema(
+    tags=["Locker Device"],
+    request=None,
+    responses={
+        status.HTTP_200_OK: ReturnConfirmationResponseSerializer,
+    },
+)
 class LockerReturnConfirmationAPIView(APIView):
     permission_classes = [IsLockerDevice]
 
@@ -379,6 +423,15 @@ class LockerReturnConfirmationAPIView(APIView):
         )   
 
 
+
+
+@extend_schema(
+    tags=["Locker Device"],
+    request=None,
+    responses={
+        status.HTTP_200_OK: LockerDeviceHeartbeatResponseSerializer,
+    },
+)
 class LockerDeviceHeartbeatAPIView(APIView):
     permission_classes = [IsLockerDevice]
 
@@ -431,6 +484,14 @@ class AdminLockerDeviceListAPIView(generics.ListAPIView):
         context["now"] = timezone.now()
         return context    
 
+
+
+@extend_schema(
+    tags=["Locker Administration"],
+    responses={
+        status.HTTP_200_OK: AdminDashboardSummarySerializer,
+    },
+)
 class AdminDashboardSummaryAPIView(APIView):
     permission_classes = [IsAdminRole]
 

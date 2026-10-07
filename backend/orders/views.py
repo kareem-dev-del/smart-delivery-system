@@ -3,6 +3,7 @@ from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from drf_spectacular.utils import extend_schema, extend_schema_view
 
 import uuid
 
@@ -106,6 +107,19 @@ class AdminOrderListAPIView(generics.ListAPIView):
         return queryset
 
 
+
+
+@extend_schema_view(
+    get=extend_schema(
+        tags=["Orders"],
+        responses={status.HTTP_200_OK: OrderReadSerializer(many=True)},
+    ),
+    post=extend_schema(
+        tags=["Orders"],
+        request=OrderCreateSerializer,
+        responses={status.HTTP_201_CREATED: OrderReadSerializer},
+    ),
+)
 class OrderListCreateAPIView(generics.ListCreateAPIView):
     def get_serializer_class(self):
         if self.request.method == "POST":
@@ -164,6 +178,12 @@ class OrderListCreateAPIView(generics.ListCreateAPIView):
         serializer.save(customer=self.request.user)
 
 
+
+
+@extend_schema(
+    tags=["Orders"],
+    responses={status.HTTP_200_OK: OrderReadSerializer},
+)
 class OrderDetailAPIView(generics.RetrieveAPIView):
     def get_serializer_class(self):
       if get_user_role(self.request.user) == UserProfile.Role.ADMIN:
@@ -223,6 +243,13 @@ class OrderDrawerAssignmentAPIView(generics.GenericAPIView):
 
         return Response(response_serializer.data, status=status.HTTP_200_OK)
 
+
+
+@extend_schema(
+    tags=["Orders"],
+    request=None,
+    responses={status.HTTP_200_OK: OrderReadSerializer},
+)
 class OrderCancellationAPIView(APIView):
     permission_classes = [IsCustomer]
 
@@ -251,6 +278,13 @@ class OrderCancellationAPIView(APIView):
         )
 
 
+
+
+@extend_schema(
+    tags=["Locker Device"],
+    request=None,
+    responses={status.HTTP_200_OK: OrderReadSerializer},
+)
 class OrderDepositAPIView(generics.GenericAPIView):
     permission_classes = [IsLockerDevice]
 
@@ -275,6 +309,13 @@ class OrderDepositAPIView(generics.GenericAPIView):
 
         return Response(response_serializer.data, status=status.HTTP_200_OK)
 
+
+
+@extend_schema(
+    tags=["Orders"],
+    request=None,
+    responses={status.HTTP_200_OK: PickupQRResponseSerializer},
+)
 class OrderPickupQRAPIView(APIView):
     permission_classes = [IsCustomer]
 
@@ -313,6 +354,15 @@ class OrderPickupQRAPIView(APIView):
 
 
 
+
+
+@extend_schema(
+    tags=["Order Administration"],
+    request=OrderCourierAssignmentSerializer,
+    responses={
+        status.HTTP_200_OK: OrderCourierAssignmentResponseSerializer,
+    },
+)
 class OrderCourierAssignmentAPIView(generics.GenericAPIView):
     serializer_class = OrderCourierAssignmentSerializer
     permission_classes = [IsAdminRole]
@@ -394,6 +444,12 @@ class CourierReturnOrderListAPIView(generics.ListAPIView):
         )
 
 
+
+@extend_schema(
+    tags=["Courier"],
+    request=None,
+    responses={status.HTTP_200_OK: CourierReturnQRResponseSerializer},
+)
 class OrderReturnQRAPIView(APIView):
     permission_classes = [IsCourier]
 

@@ -1,15 +1,28 @@
 from django.contrib import admin
 from django.urls import include, path
 
+from django.conf import settings
+from drf_spectacular.views import (
+    SpectacularAPIView,
+    SpectacularSwaggerView,
+)
+
 from accounts.views import (
     ThrottledTokenObtainPairView,
     ThrottledTokenRefreshView,
 )
 
 
+
+from config.health import health, readiness
+
+
 urlpatterns = [
+
+    path("health/", health, name="health"),
+    path("ready/", readiness, name="readiness"),
     path("admin/", admin.site.urls),
-   path(
+    path(
     "api/token/",
     ThrottledTokenObtainPairView.as_view(),
     name="token-obtain-pair",
@@ -27,3 +40,20 @@ urlpatterns = [
     path("api/notifications/", include("notifications.urls")),
     path("api/audit/", include("audit.urls")),
 ]
+
+
+if settings.API_DOCUMENTATION_ENABLED:
+    urlpatterns += [
+        path(
+            "api/schema/",
+            SpectacularAPIView.as_view(),
+            name="api-schema",
+        ),
+        path(
+            "api/docs/",
+            SpectacularSwaggerView.as_view(
+                url_name="api-schema",
+            ),
+            name="api-docs",
+        ),
+    ]

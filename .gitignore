@@ -28,3 +28,6 @@ logs/
 # OS
 Thumbs.db
 .DS_Store
+
+# Local REST Client requests may contain credentials or JWTs.
+api.http
