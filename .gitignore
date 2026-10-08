@@ -31,3 +31,6 @@ Thumbs.db
 
 # Local REST Client requests may contain credentials or JWTs.
 api.http
+# Local API request files
+api-requests/*.http
+!api-requests/*.http.example
