@@ -35,10 +35,10 @@ class NotificationListAPIView(generics.ListAPIView):
             .order_by("-created_at")
         )
 
-        if "unread" in filter_serializer.validated_data:
-            unread = filter_serializer.validated_data["unread"]
+        if "unread" in self.request.query_params:
+           unread = filter_serializer.validated_data["unread"]
 
-            queryset = queryset.filter(is_read=not unread)
+           queryset = queryset.filter(is_read=not unread)
 
         return queryset
 

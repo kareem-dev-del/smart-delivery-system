@@ -1,0 +1,151 @@
+@baseUrl = http://127.0.0.1:8000
+
+@demoPassword = REPLACE_WITH_YOUR_LOCAL_DEMO_PASSWORD
+
+@adminAccessToken = PASTE_ADMIN_ACCESS_TOKEN_HERE
+@customerAccessToken = PASTE_CUSTOMER_ACCESS_TOKEN_HERE
+@courierAccessToken = PASTE_COURIER_ACCESS_TOKEN_HERE
+@deviceAccessToken = PASTE_DEVICE_ACCESS_TOKEN_HERE
+
+@smallProductId = 1
+@lockerStationId = 1
+@smallDrawerId = 1
+@courierId = 3
+
+@orderPublicId = PASTE_ORDER_PUBLIC_ID_HERE
+@pickupQrToken = PASTE_PICKUP_QR_TOKEN_HERE
+
+
+### 0. Check that Django is running.
+GET {{baseUrl}}/health/
+
+
+### 1. Public product catalog. No token is needed.
+GET {{baseUrl}}/api/products/
+Accept: application/json
+
+
+### 2. Sign in as the admin.
+POST {{baseUrl}}/api/token/
+Content-Type: application/json
+
+{
+  "username": "demo-admin",
+  "password": "{{demoPassword}}"
+}
+
+
+### 3. Sign in as the customer.
+POST {{baseUrl}}/api/token/
+Content-Type: application/json
+
+{
+  "username": "demo-customer",
+  "password": "{{demoPassword}}"
+}
+
+
+### 4. Sign in as the courier.
+POST {{baseUrl}}/api/token/
+Content-Type: application/json
+
+{
+  "username": "demo-courier",
+  "password": "{{demoPassword}}"
+}
+
+
+### 5. Sign in as the locker device.
+POST {{baseUrl}}/api/token/
+Content-Type: application/json
+
+{
+  "username": "demo-locker-device",
+  "password": "{{demoPassword}}"
+}
+
+
+### 6. The locker device reports that it is online.
+POST {{baseUrl}}/api/lockers/device/heartbeat/
+Authorization: Bearer {{deviceAccessToken}}
+
+
+### 7. Customer creates an order for a small product.
+POST {{baseUrl}}/api/orders/
+Authorization: Bearer {{customerAccessToken}}
+Content-Type: application/json
+
+{
+  "items": [
+    {
+      "product_id": {{smallProductId}},
+      "quantity": 1
+    }
+  ]
+}
+
+
+### 8. Admin assigns the courier to the order.
+POST {{baseUrl}}/api/orders/{{orderPublicId}}/assign-courier/
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{
+  "courier_id": {{courierId}}
+}
+
+
+### 9. Courier sees the assigned order.
+GET {{baseUrl}}/api/orders/courier/assignments/
+Authorization: Bearer {{courierAccessToken}}
+
+
+### 10. Admin reserves a suitable drawer in the locker.
+POST {{baseUrl}}/api/orders/{{orderPublicId}}/assign/
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{
+  "locker_station_id": {{lockerStationId}},
+  "drawer_id": {{smallDrawerId}}
+}
+
+
+### 11. Locker device confirms the courier placed the package inside.
+POST {{baseUrl}}/api/orders/{{orderPublicId}}/deposit/
+Authorization: Bearer {{deviceAccessToken}}
+
+
+### 12. Customer sees the ready-for-pickup notification.
+GET {{baseUrl}}/api/notifications/
+Authorization: Bearer {{customerAccessToken}}
+
+
+### 13. Customer requests a secure pickup QR token.
+POST {{baseUrl}}/api/orders/{{orderPublicId}}/pickup-qr/
+Authorization: Bearer {{customerAccessToken}}
+
+
+### 14. Locker device scans the QR token and receives an open-drawer command.
+POST {{baseUrl}}/api/lockers/pickup-scan/
+Authorization: Bearer {{deviceAccessToken}}
+Content-Type: application/json
+
+{
+  "token": "{{pickupQrToken}}"
+}
+
+
+### 15. Locker device confirms the package was collected.
+POST {{baseUrl}}/api/lockers/orders/{{orderPublicId}}/confirm-collection/
+Authorization: Bearer {{deviceAccessToken}}
+
+
+### 16. Customer verifies that the order is collected.
+GET {{baseUrl}}/api/orders/{{orderPublicId}}/
+Authorization: Bearer {{customerAccessToken}}
+
+
+### 17. Admin sees the final operational summary.
+GET {{baseUrl}}/api/lockers/admin/dashboard/
+Authorization: Bearer {{adminAccessToken}}

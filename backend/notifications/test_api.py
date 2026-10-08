@@ -2,6 +2,7 @@ from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
+from django.utils import timezone
 
 from .models import Notification
 
@@ -39,6 +40,33 @@ class NotificationAPIViewTests(APITestCase):
         self.assertEqual(
             response.status_code,
             status.HTTP_401_UNAUTHORIZED,
+        )
+
+    def test_user_sees_all_own_notifications_without_unread_filter(self):
+        read_notification = Notification.objects.create(
+            user=self.customer,
+            notification_type=Notification.Type.ORDER_PICKUP_EXPIRED,
+            title="Order expired",
+            message="Your pickup window expired.",
+            is_read=True,
+            read_at=timezone.now(),
+        )
+
+        self.client.force_authenticate(user=self.customer)
+
+        response = self.client.get(reverse("notification-list"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 2)
+        self.assertSetEqual(
+            {
+                notification["id"]
+                for notification in response.data["results"]
+            },
+            {
+                self.own_notification.id,
+                read_notification.id,
+            },
         )
 
     def test_user_sees_only_own_unread_notifications(self):
