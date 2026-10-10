@@ -1,11 +1,11 @@
 from io import StringIO
-
+from uuid import uuid4
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import TestCase, override_settings
 
-from lockers.models import Drawer, LockerDevice, LockerStation
+from lockers.models import Drawer, LockerDevice, LockerStation,LockerDeviceRequest
 from orders.models import Order
 from products.models import Product
 
@@ -43,6 +43,15 @@ class ResetDemoWorkflowCommandTests(TestCase):
             status=Order.Status.READY_FOR_PICKUP,
             total_amount="250.00",
         )
+        receipt = LockerDeviceRequest.objects.create(
+            locker_device=self.device,
+            order=order,
+            operation=LockerDeviceRequest.Operation.DEPOSIT_CONFIRMATION,
+            idempotency_key=uuid4(),
+            request_hash="a" * 64,
+            response_status=200,
+            response_body={"status": "ready_for_pickup"},
+        )
 
         self.drawer.status = Drawer.Status.OCCUPIED
         self.drawer.save(update_fields=["status"])
@@ -59,6 +68,9 @@ class ResetDemoWorkflowCommandTests(TestCase):
         )
 
         self.assertFalse(Order.objects.filter(id=order.id).exists())
+        self.assertFalse(
+            LockerDeviceRequest.objects.filter(id=receipt.id).exists()
+        )
 
         self.drawer.refresh_from_db()
         self.assertEqual(self.drawer.status, Drawer.Status.AVAILABLE)

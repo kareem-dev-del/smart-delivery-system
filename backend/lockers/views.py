@@ -7,6 +7,21 @@ from .services import (
     get_admin_dashboard_summary,
     set_locker_device_active,
 )
+
+from django.db import transaction
+from .openapi import LOCKER_DEVICE_IDEMPOTENCY_KEY_PARAMETER
+
+from orders.models import Order
+
+from .idempotency import (
+    OpenCommandReplayUnavailable,
+    build_request_hash,
+    can_replay_open_command,
+    create_completed_receipt,
+    get_replay_receipt,
+    parse_idempotency_key,
+)
+
 from drf_spectacular.utils import extend_schema
 
 from django.utils import timezone
@@ -36,7 +51,16 @@ from accounts.throttles import LockerQRScanRateThrottle
 from accounts.models import UserProfile
 from accounts.permissions import get_user_role
 
-from .models import Drawer, LockerDevice, LockerStation
+
+from .models import (
+    Drawer,
+    LockerDevice,
+    LockerDeviceRequest,
+    LockerStation,
+)
+
+
+
 from .serializers import (
     LockerStationDetailSerializer,
     LockerStationListSerializer,
@@ -253,6 +277,7 @@ class LockerStationRetrieveAPIView(generics.RetrieveAPIView):
 @extend_schema(
     tags=["Locker Device"],
     request=PickupQRScanSerializer,
+    parameters=[LOCKER_DEVICE_IDEMPOTENCY_KEY_PARAMETER],
     responses={
         status.HTTP_200_OK: OpenDrawerAuthorizationSerializer,
     },
@@ -261,17 +286,83 @@ class LockerPickupScanAPIView(APIView):
     permission_classes = [IsLockerDevice]
     throttle_classes = [LockerQRScanRateThrottle]
 
+    @transaction.atomic
     def post(self, request):
         serializer = PickupQRScanSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        idempotency_key = parse_idempotency_key(request)
+
+        try:
+            locker_device = LockerDevice.objects.select_for_update().get(
+                user=request.user,
+                is_active=True,
+            )
+        except LockerDevice.DoesNotExist:
+            return Response(
+                {"device": "Active locker device not found."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        operation = LockerDeviceRequest.Operation.PICKUP_SCAN
+        raw_token = serializer.validated_data["token"]
+        request_hash = build_request_hash(
+            operation=operation,
+            payload={"token": raw_token},
+        )
+
+        replay_receipt = get_replay_receipt(
+            locker_device=locker_device,
+            idempotency_key=idempotency_key,
+            operation=operation,
+            request_hash=request_hash,
+        )
+
+        if replay_receipt is not None:
+            if (
+                not replay_receipt.order_id
+                or not can_replay_open_command(
+                    receipt=replay_receipt,
+                )
+            ):
+                raise OpenCommandReplayUnavailable()
+
+            replay_order = Order.objects.select_for_update().get(
+                id=replay_receipt.order_id,
+            )
+
+            if (
+                replay_order.status != Order.Status.READY_FOR_PICKUP
+                or not replay_order.assigned_drawer_id
+                or replay_order.locker_station_id
+                != locker_device.locker_station_id
+            ):
+                raise OpenCommandReplayUnavailable()
+
+            replay_drawer = Drawer.objects.select_for_update().get(
+                id=replay_order.assigned_drawer_id,
+            )
+
+            if replay_drawer.status != Drawer.Status.OCCUPIED:
+                raise OpenCommandReplayUnavailable()
+
+            return Response(
+                replay_receipt.response_body,
+                status=replay_receipt.response_status,
+                headers={"Cache-Control": "no-store"},
+            )
+
         try:
             order, drawer = authorize_pickup_by_qr(
-                raw_token=serializer.validated_data["token"],
+                raw_token=raw_token,
                 device_user=request.user,
             )
         except DjangoValidationError as error:
-            detail = getattr(error, "message_dict", {"detail": error.messages})
+            detail = getattr(
+                error,
+                "message_dict",
+                {"detail": error.messages},
+            )
 
             return Response(
                 detail,
@@ -285,18 +376,29 @@ class LockerPickupScanAPIView(APIView):
                 "order_public_id": order.public_id,
             }
         )
+        response_data = response_serializer.data
+
+        create_completed_receipt(
+            locker_device=locker_device,
+            order=order,
+            operation=operation,
+            idempotency_key=idempotency_key,
+            request_hash=request_hash,
+            response_status=status.HTTP_200_OK,
+            response_body=response_data,
+        )
 
         return Response(
-            response_serializer.data,
+            response_data,
             status=status.HTTP_200_OK,
             headers={"Cache-Control": "no-store"},
-        )  
-
+        )
 
 
 @extend_schema(
     tags=["Locker Device"],
     request=PickupQRScanSerializer,
+    parameters=[LOCKER_DEVICE_IDEMPOTENCY_KEY_PARAMETER],
     responses={
         status.HTTP_200_OK: OpenDrawerAuthorizationSerializer,
     },
@@ -305,17 +407,84 @@ class LockerReturnScanAPIView(APIView):
     permission_classes = [IsLockerDevice]
     throttle_classes = [LockerQRScanRateThrottle]
 
+    @transaction.atomic
     def post(self, request):
         serializer = PickupQRScanSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        idempotency_key = parse_idempotency_key(request)
+
+        try:
+            locker_device = LockerDevice.objects.select_for_update().get(
+                user=request.user,
+                is_active=True,
+            )
+        except LockerDevice.DoesNotExist:
+            return Response(
+                {"device": "Active locker device not found."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        operation = LockerDeviceRequest.Operation.RETURN_SCAN
+        raw_token = serializer.validated_data["token"]
+        request_hash = build_request_hash(
+            operation=operation,
+            payload={"token": raw_token},
+        )
+
+        replay_receipt = get_replay_receipt(
+            locker_device=locker_device,
+            idempotency_key=idempotency_key,
+            operation=operation,
+            request_hash=request_hash,
+        )
+
+        if replay_receipt is not None:
+            if (
+                not replay_receipt.order_id
+                or not can_replay_open_command(
+                    receipt=replay_receipt,
+                )
+            ):
+                raise OpenCommandReplayUnavailable()
+
+            replay_order = Order.objects.select_for_update().get(
+                id=replay_receipt.order_id,
+            )
+
+            if (
+                replay_order.status != Order.Status.EXPIRED
+                or not replay_order.return_opened_at
+                or not replay_order.assigned_drawer_id
+                or replay_order.locker_station_id
+                != locker_device.locker_station_id
+            ):
+                raise OpenCommandReplayUnavailable()
+
+            replay_drawer = Drawer.objects.select_for_update().get(
+                id=replay_order.assigned_drawer_id,
+            )
+
+            if replay_drawer.status != Drawer.Status.RETURN_PENDING:
+                raise OpenCommandReplayUnavailable()
+
+            return Response(
+                replay_receipt.response_body,
+                status=replay_receipt.response_status,
+                headers={"Cache-Control": "no-store"},
+            )
+
         try:
             order, drawer = authorize_return_by_qr(
-                raw_token=serializer.validated_data["token"],
+                raw_token=raw_token,
                 device_user=request.user,
             )
         except DjangoValidationError as error:
-            detail = getattr(error, "message_dict", {"detail": error.messages})
+            detail = getattr(
+                error,
+                "message_dict",
+                {"detail": error.messages},
+            )
 
             return Response(
                 detail,
@@ -329,9 +498,20 @@ class LockerReturnScanAPIView(APIView):
                 "order_public_id": order.public_id,
             }
         )
+        response_data = response_serializer.data
+
+        create_completed_receipt(
+            locker_device=locker_device,
+            order=order,
+            operation=operation,
+            idempotency_key=idempotency_key,
+            request_hash=request_hash,
+            response_status=status.HTTP_200_OK,
+            response_body=response_data,
+        )
 
         return Response(
-            response_serializer.data,
+            response_data,
             status=status.HTTP_200_OK,
             headers={"Cache-Control": "no-store"},
         )      
@@ -340,6 +520,7 @@ class LockerReturnScanAPIView(APIView):
 
 @extend_schema(
     tags=["Locker Device"],
+    parameters=[LOCKER_DEVICE_IDEMPOTENCY_KEY_PARAMETER],
     request=None,
     responses={
         status.HTTP_200_OK: CollectionConfirmationResponseSerializer,
@@ -348,14 +529,54 @@ class LockerReturnScanAPIView(APIView):
 class LockerCollectionConfirmationAPIView(APIView):
     permission_classes = [IsLockerDevice]
 
+    @transaction.atomic
     def post(self, request, public_id):
+        idempotency_key = parse_idempotency_key(request)
+
+        try:
+            locker_device = LockerDevice.objects.select_for_update().get(
+                user=request.user,
+                is_active=True,
+            )
+        except LockerDevice.DoesNotExist:
+            return Response(
+                {"device": "Active locker device not found."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        operation = (
+            LockerDeviceRequest.Operation.COLLECTION_CONFIRMATION
+        )
+        request_hash = build_request_hash(
+            operation=operation,
+            payload={"order_public_id": str(public_id)},
+        )
+
+        replay_receipt = get_replay_receipt(
+            locker_device=locker_device,
+            idempotency_key=idempotency_key,
+            operation=operation,
+            request_hash=request_hash,
+        )
+
+        if replay_receipt is not None:
+            return Response(
+                replay_receipt.response_body,
+                status=replay_receipt.response_status,
+                headers={"Cache-Control": "no-store"},
+            )
+
         try:
             order, drawer = confirm_package_collection(
                 order_public_id=public_id,
                 device_user=request.user,
             )
         except DjangoValidationError as error:
-            detail = getattr(error, "message_dict", {"detail": error.messages})
+            detail = getattr(
+                error,
+                "message_dict",
+                {"detail": error.messages},
+            )
 
             return Response(
                 detail,
@@ -371,9 +592,20 @@ class LockerCollectionConfirmationAPIView(APIView):
                 "collected_at": order.collected_at,
             }
         )
+        response_data = response_serializer.data
+
+        create_completed_receipt(
+            locker_device=locker_device,
+            order=order,
+            operation=operation,
+            idempotency_key=idempotency_key,
+            request_hash=request_hash,
+            response_status=status.HTTP_200_OK,
+            response_body=response_data,
+        )
 
         return Response(
-            response_serializer.data,
+            response_data,
             status=status.HTTP_200_OK,
             headers={"Cache-Control": "no-store"},
         )
@@ -383,6 +615,7 @@ class LockerCollectionConfirmationAPIView(APIView):
 
 @extend_schema(
     tags=["Locker Device"],
+    parameters=[LOCKER_DEVICE_IDEMPOTENCY_KEY_PARAMETER],
     request=None,
     responses={
         status.HTTP_200_OK: ReturnConfirmationResponseSerializer,
@@ -391,15 +624,54 @@ class LockerCollectionConfirmationAPIView(APIView):
 class LockerReturnConfirmationAPIView(APIView):
     permission_classes = [IsLockerDevice]
 
+    @transaction.atomic
     def post(self, request, public_id):
+        idempotency_key = parse_idempotency_key(request)
+
+        try:
+            locker_device = LockerDevice.objects.select_for_update().get(
+                user=request.user,
+                is_active=True,
+            )
+        except LockerDevice.DoesNotExist:
+            return Response(
+                {"device": "Active locker device not found."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        operation = (
+            LockerDeviceRequest.Operation.RETURN_CONFIRMATION
+        )
+        request_hash = build_request_hash(
+            operation=operation,
+            payload={"order_public_id": str(public_id)},
+        )
+
+        replay_receipt = get_replay_receipt(
+            locker_device=locker_device,
+            idempotency_key=idempotency_key,
+            operation=operation,
+            request_hash=request_hash,
+        )
+
+        if replay_receipt is not None:
+            return Response(
+                replay_receipt.response_body,
+                status=replay_receipt.response_status,
+                headers={"Cache-Control": "no-store"},
+            )
+
         try:
             order, drawer = confirm_package_return(
                 order_public_id=public_id,
                 device_user=request.user,
-                
             )
         except DjangoValidationError as error:
-            detail = getattr(error, "message_dict", {"detail": error.messages})
+            detail = getattr(
+                error,
+                "message_dict",
+                {"detail": error.messages},
+            )
 
             return Response(
                 detail,
@@ -415,9 +687,20 @@ class LockerReturnConfirmationAPIView(APIView):
                 "returned_at": order.returned_at,
             }
         )
+        response_data = response_serializer.data
+
+        create_completed_receipt(
+            locker_device=locker_device,
+            order=order,
+            operation=operation,
+            idempotency_key=idempotency_key,
+            request_hash=request_hash,
+            response_status=status.HTTP_200_OK,
+            response_body=response_data,
+        )
 
         return Response(
-            response_serializer.data,
+            response_data,
             status=status.HTTP_200_OK,
             headers={"Cache-Control": "no-store"},
         )   

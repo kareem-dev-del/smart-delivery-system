@@ -4,6 +4,18 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema, extend_schema_view
+from lockers.openapi import LOCKER_DEVICE_IDEMPOTENCY_KEY_PARAMETER
+
+
+from django.db import transaction
+
+from lockers.idempotency import (
+    build_request_hash,
+    create_completed_receipt,
+    get_replay_receipt,
+    parse_idempotency_key,
+)
+from lockers.models import LockerDevice, LockerDeviceRequest
 
 import uuid
 
@@ -277,25 +289,62 @@ class OrderCancellationAPIView(APIView):
             status=status.HTTP_200_OK,
         )
 
-
-
-
 @extend_schema(
     tags=["Locker Device"],
     request=None,
+    parameters=[LOCKER_DEVICE_IDEMPOTENCY_KEY_PARAMETER],
     responses={status.HTTP_200_OK: OrderReadSerializer},
 )
 class OrderDepositAPIView(generics.GenericAPIView):
     permission_classes = [IsLockerDevice]
 
+    @transaction.atomic
     def post(self, request, public_id):
+        idempotency_key = parse_idempotency_key(request)
+
+        try:
+            locker_device = LockerDevice.objects.select_for_update().get(
+                user=request.user,
+                is_active=True,
+            )
+        except LockerDevice.DoesNotExist:
+            return Response(
+                {"device": "Active locker device not found."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        operation = (
+            LockerDeviceRequest.Operation.DEPOSIT_CONFIRMATION
+        )
+        request_hash = build_request_hash(
+            operation=operation,
+            payload={"order_public_id": str(public_id)},
+        )
+
+        replay_receipt = get_replay_receipt(
+            locker_device=locker_device,
+            idempotency_key=idempotency_key,
+            operation=operation,
+            request_hash=request_hash,
+        )
+
+        if replay_receipt is not None:
+            return Response(
+                replay_receipt.response_body,
+                status=replay_receipt.response_status,
+            )
+
         try:
             order = confirm_order_deposit(
                 order_public_id=public_id,
                 device_user=request.user,
             )
         except DjangoValidationError as error:
-            detail = getattr(error, "message_dict", {"detail": error.messages})
+            detail = getattr(
+                error,
+                "message_dict",
+                {"detail": error.messages},
+            )
 
             return Response(
                 detail,
@@ -306,9 +355,22 @@ class OrderDepositAPIView(generics.GenericAPIView):
             order,
             context=self.get_serializer_context(),
         )
+        response_data = response_serializer.data
 
-        return Response(response_serializer.data, status=status.HTTP_200_OK)
+        create_completed_receipt(
+            locker_device=locker_device,
+            order=order,
+            operation=operation,
+            idempotency_key=idempotency_key,
+            request_hash=request_hash,
+            response_status=status.HTTP_200_OK,
+            response_body=response_data,
+        )
 
+        return Response(
+            response_data,
+            status=status.HTTP_200_OK,
+        )
 
 
 @extend_schema(

@@ -1,4 +1,5 @@
 from decimal import Decimal
+from uuid import uuid4
 
 from django.contrib.auth import get_user_model
 from django.urls import reverse
@@ -11,6 +12,7 @@ from lockers.models import (
     LockerDevice,
     LockerEventLog,
     LockerStation,
+    LockerDeviceRequest,
 )
 from products.models import Product
 
@@ -101,10 +103,34 @@ class OrderDepositAPIViewTests(APITestCase):
             drawer_id=self.drawer.id,
         )
 
-    def deposit_url(self):
+    def deposit_url(self, public_id=None):
         return reverse(
             "order-deposit",
-            kwargs={"public_id": self.order.public_id},
+            kwargs={
+                "public_id": public_id or self.order.public_id,
+            },
+        )
+
+
+    def post_deposit(self, *, idempotency_key=None, public_id=None):
+        return self.client.post(
+            self.deposit_url(public_id=public_id),
+            HTTP_IDEMPOTENCY_KEY=str(idempotency_key or uuid4()),
+        )
+
+
+    def create_assigned_order(self, *, drawer):
+        order = create_order(
+            customer=self.customer,
+            items=[
+                {"product_id": self.product.id, "quantity": 1},
+            ],
+        )
+
+        return assign_order_to_drawer(
+            order_public_id=order.public_id,
+            locker_station_id=self.locker.id,
+            drawer_id=drawer.id,
         )
 
     def test_unauthenticated_user_cannot_confirm_deposit(self):
@@ -115,14 +141,14 @@ class OrderDepositAPIViewTests(APITestCase):
     def test_customer_cannot_confirm_deposit(self):
         self.client.force_authenticate(user=self.customer)
 
-        response = self.client.post(self.deposit_url())
+        response = self.post_deposit()
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_device_cannot_confirm_deposit_for_another_locker(self):
         self.client.force_authenticate(user=self.other_device_user)
 
-        response = self.client.post(self.deposit_url())
+        response = self.post_deposit()
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
@@ -135,7 +161,7 @@ class OrderDepositAPIViewTests(APITestCase):
     def test_correct_device_confirms_package_deposit(self):
         self.client.force_authenticate(user=self.device_user)
 
-        response = self.client.post(self.deposit_url())
+        response = self.post_deposit()
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(
@@ -170,14 +196,87 @@ class OrderDepositAPIViewTests(APITestCase):
             event_types,
         )
 
-    def test_device_cannot_confirm_deposit_twice(self):
+    def test_device_must_send_an_idempotency_key(self):
         self.client.force_authenticate(user=self.device_user)
 
-        first_response = self.client.post(self.deposit_url())
-        second_response = self.client.post(self.deposit_url())
+        response = self.client.post(self.deposit_url())
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("idempotency_key", response.data)
+
+
+    def test_same_idempotency_key_replays_deposit_result(self):
+        self.client.force_authenticate(user=self.device_user)
+        idempotency_key = uuid4()
+
+        first_response = self.post_deposit(
+            idempotency_key=idempotency_key,
+        )
+        second_response = self.post_deposit(
+            idempotency_key=idempotency_key,
+        )
+
+        self.assertEqual(first_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(second_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(first_response.data, second_response.data)
+
+        self.assertEqual(
+            LockerDeviceRequest.objects.filter(
+                locker_device__user=self.device_user,
+            ).count(),
+            1,
+        )
+        self.assertEqual(
+            LockerEventLog.objects.filter(
+                order=self.order,
+                event_type=LockerEventLog.EventType.PACKAGE_DEPOSITED,
+            ).count(),
+            1,
+        )
+
+
+    def test_new_key_cannot_repeat_completed_deposit(self):
+        self.client.force_authenticate(user=self.device_user)
+
+        first_response = self.post_deposit()
+        second_response = self.post_deposit()
 
         self.assertEqual(first_response.status_code, status.HTTP_200_OK)
         self.assertEqual(
             second_response.status_code,
             status.HTTP_400_BAD_REQUEST,
         )
+
+    def test_same_key_cannot_be_reused_for_another_order(self):
+        self.client.force_authenticate(user=self.device_user)
+
+        second_drawer = Drawer.objects.create(
+            locker_station=self.locker,
+            number=2,
+            size=Drawer.Size.SMALL,
+            status=Drawer.Status.AVAILABLE,
+        )
+        second_order = self.create_assigned_order(
+            drawer=second_drawer,
+        )
+        idempotency_key = uuid4()
+
+        first_response = self.post_deposit(
+            idempotency_key=idempotency_key,
+        )
+        conflict_response = self.post_deposit(
+            idempotency_key=idempotency_key,
+            public_id=second_order.public_id,
+        )
+
+        self.assertEqual(first_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            conflict_response.status_code,
+            status.HTTP_409_CONFLICT,
+        )
+
+        second_order.refresh_from_db()
+        second_drawer.refresh_from_db()
+
+        self.assertEqual(second_order.status, Order.Status.ASSIGNED)
+        self.assertEqual(second_drawer.status, Drawer.Status.RESERVED)
