@@ -7,12 +7,15 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from uuid import uuid4
+
 from accounts.models import UserProfile
 from lockers.models import (
     Drawer,
     LockerDevice,
     LockerEventLog,
     LockerStation,
+    LockerDeviceRequest,
 )
 from orders.models import Order, QRToken
 from orders.services import (
@@ -120,6 +123,11 @@ class LockerReturnConfirmationAPIViewTests(APITestCase):
             kwargs={"public_id": self.order.public_id},
         )
 
+    def post_confirmation(self, *, idempotency_key=None):
+        return self.client.post(
+            self.confirm_url(),
+            HTTP_IDEMPOTENCY_KEY=str(idempotency_key or uuid4()),
+        )
     def test_unauthenticated_user_cannot_confirm_return(self):
         response = self.client.post(self.confirm_url())
 
@@ -135,7 +143,7 @@ class LockerReturnConfirmationAPIViewTests(APITestCase):
     def test_other_locker_device_cannot_confirm_return(self):
         self.client.force_authenticate(user=self.other_device_user)
 
-        response = self.client.post(self.confirm_url())
+        response = self.post_confirmation()
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
@@ -160,7 +168,7 @@ class LockerReturnConfirmationAPIViewTests(APITestCase):
 
         self.client.force_authenticate(user=self.device_user)
 
-        response = self.client.post(self.confirm_url())
+        response = self.post_confirmation()
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(
@@ -206,7 +214,7 @@ class LockerReturnConfirmationAPIViewTests(APITestCase):
 
         self.client.force_authenticate(user=self.device_user)
 
-        response = self.client.post(self.confirm_url())
+        response = self.post_confirmation()
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
@@ -219,11 +227,49 @@ class LockerReturnConfirmationAPIViewTests(APITestCase):
             Drawer.Status.RETURN_PENDING,
         )
 
-    def test_return_cannot_be_confirmed_twice(self):
+    def test_same_idempotency_key_replays_return_confirmation(self):
+        self.client.force_authenticate(user=self.device_user)
+        idempotency_key = uuid4()
+
+        first_response = self.post_confirmation(
+            idempotency_key=idempotency_key,
+        )
+        second_response = self.post_confirmation(
+            idempotency_key=idempotency_key,
+        )
+
+        self.assertEqual(first_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(second_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(first_response.data, second_response.data)
+
+        self.assertEqual(
+            LockerDeviceRequest.objects.filter(
+                locker_device__user=self.device_user,
+            ).count(),
+            1,
+        )
+        self.assertEqual(
+            LockerEventLog.objects.filter(
+                order=self.order,
+                event_type=LockerEventLog.EventType.PACKAGE_RETURNED,
+            ).count(),
+            1,
+        )
+
+    def test_device_must_send_an_idempotency_key(self):
         self.client.force_authenticate(user=self.device_user)
 
-        first_response = self.client.post(self.confirm_url())
-        second_response = self.client.post(self.confirm_url())
+        response = self.client.post(self.confirm_url())
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("idempotency_key", response.data)
+
+
+    def test_new_key_cannot_repeat_completed_return(self):
+        self.client.force_authenticate(user=self.device_user)
+
+        first_response = self.post_confirmation()
+        second_response = self.post_confirmation()
 
         self.assertEqual(first_response.status_code, status.HTTP_200_OK)
         self.assertEqual(

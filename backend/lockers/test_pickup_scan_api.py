@@ -1,6 +1,10 @@
 from datetime import timedelta
 from decimal import Decimal
 
+from uuid import uuid4
+
+from django.test import override_settings
+
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django.utils import timezone
@@ -13,6 +17,7 @@ from lockers.models import (
     LockerDevice,
     LockerEventLog,
     LockerStation,
+    LockerDeviceRequest,
 )
 from orders.models import Order, QRToken
 from orders.services import issue_pickup_qr_token
@@ -98,6 +103,14 @@ class LockerPickupScanAPIViewTests(APITestCase):
     def scan_url(self):
         return reverse("locker-pickup-scan")
 
+    def post_scan(self, *, raw_token=None, idempotency_key=None):
+        return self.client.post(
+            self.scan_url(),
+            {"token": raw_token or self.raw_token},
+            format="json",
+            HTTP_IDEMPOTENCY_KEY=str(idempotency_key or uuid4()),
+        )
+
     def test_unauthenticated_user_cannot_scan_qr(self):
         response = self.client.post(
             self.scan_url(),
@@ -121,11 +134,7 @@ class LockerPickupScanAPIViewTests(APITestCase):
     def test_correct_locker_device_can_authorize_drawer_opening(self):
         self.client.force_authenticate(user=self.device_user)
 
-        response = self.client.post(
-            self.scan_url(),
-            {"token": self.raw_token},
-            format="json",
-        )
+        response = self.post_scan()
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["command"], "open_drawer")
@@ -157,36 +166,35 @@ class LockerPickupScanAPIViewTests(APITestCase):
     def test_other_locker_device_cannot_open_order_drawer(self):
         self.client.force_authenticate(user=self.other_device_user)
 
-        response = self.client.post(
-            self.scan_url(),
-            {"token": self.raw_token},
-            format="json",
-        )
+        response = self.post_scan()
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
         self.qr_token.refresh_from_db()
         self.assertIsNone(self.qr_token.used_at)
 
-    def test_qr_token_cannot_be_scanned_twice(self):
+    def test_same_idempotency_key_replays_open_drawer_command(self):
         self.client.force_authenticate(user=self.device_user)
+        idempotency_key = uuid4()
 
-        first_response = self.client.post(
-            self.scan_url(),
-            {"token": self.raw_token},
-            format="json",
+        first_response = self.post_scan(
+            idempotency_key=idempotency_key,
         )
-
-        second_response = self.client.post(
-            self.scan_url(),
-            {"token": self.raw_token},
-            format="json",
+        second_response = self.post_scan(
+            idempotency_key=idempotency_key,
         )
 
         self.assertEqual(first_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(second_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(first_response.data, second_response.data)
+        self.assertEqual(first_response["Cache-Control"], "no-store")
+        self.assertEqual(second_response["Cache-Control"], "no-store")
+
         self.assertEqual(
-            second_response.status_code,
-            status.HTTP_400_BAD_REQUEST,
+            LockerDeviceRequest.objects.filter(
+                locker_device__user=self.device_user,
+            ).count(),
+            1,
         )
         self.assertEqual(
             LockerEventLog.objects.filter(
@@ -202,6 +210,16 @@ class LockerPickupScanAPIViewTests(APITestCase):
 
         self.client.force_authenticate(user=self.device_user)
 
+        response = self.post_scan()
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        self.qr_token.refresh_from_db()
+        self.assertIsNone(self.qr_token.used_at)
+
+    def test_device_must_send_an_idempotency_key(self):
+        self.client.force_authenticate(user=self.device_user)
+
         response = self.client.post(
             self.scan_url(),
             {"token": self.raw_token},
@@ -209,6 +227,68 @@ class LockerPickupScanAPIViewTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("idempotency_key", response.data)
 
-        self.qr_token.refresh_from_db()
-        self.assertIsNone(self.qr_token.used_at)
+    def test_new_key_cannot_scan_an_already_used_qr_token(self):
+        self.client.force_authenticate(user=self.device_user)
+
+        first_response = self.post_scan()
+        second_response = self.post_scan()
+
+        self.assertEqual(first_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            second_response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+
+    @override_settings(LOCKER_DEVICE_OPEN_COMMAND_REPLAY_SECONDS=60)
+    def test_expired_replay_does_not_reissue_open_command(self):
+        self.client.force_authenticate(user=self.device_user)
+        idempotency_key = uuid4()
+
+        first_response = self.post_scan(
+            idempotency_key=idempotency_key,
+        )
+
+        receipt = LockerDeviceRequest.objects.get(
+            locker_device__user=self.device_user,
+            idempotency_key=idempotency_key,
+        )
+        receipt.processed_at = timezone.now() - timedelta(seconds=61)
+        receipt.save(update_fields=("processed_at",))
+
+        replay_response = self.post_scan(
+            idempotency_key=idempotency_key,
+        )
+
+        self.assertEqual(first_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            replay_response.status_code,
+            status.HTTP_409_CONFLICT,
+        )
+
+
+    def test_replay_does_not_open_drawer_after_collection(self):
+        self.client.force_authenticate(user=self.device_user)
+        idempotency_key = uuid4()
+
+        first_response = self.post_scan(
+            idempotency_key=idempotency_key,
+        )
+
+        self.order.status = Order.Status.COLLECTED
+        self.order.save(update_fields=("status",))
+
+        self.drawer.status = Drawer.Status.AVAILABLE
+        self.drawer.save(update_fields=("status",))
+
+        replay_response = self.post_scan(
+            idempotency_key=idempotency_key,
+        )
+
+        self.assertEqual(first_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            replay_response.status_code,
+            status.HTTP_409_CONFLICT,
+        )

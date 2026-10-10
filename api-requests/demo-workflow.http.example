@@ -7,6 +7,14 @@
 @courierAccessToken = PASTE_COURIER_ACCESS_TOKEN_HERE
 @deviceAccessToken = PASTE_DEVICE_ACCESS_TOKEN_HERE
 
+
+# Use a fresh UUID for every new physical device operation.
+# Reuse the same UUID only if the same request needs a retry.
+@depositIdempotencyKey = 00000000-0000-4000-8000-000000000011
+@pickupScanIdempotencyKey = 00000000-0000-4000-8000-000000000014
+@collectionIdempotencyKey = 00000000-0000-4000-8000-000000000015
+
+
 @smallProductId = 1
 @lockerStationId = 1
 @smallDrawerId = 1
@@ -114,6 +122,7 @@ Content-Type: application/json
 ### 11. Locker device confirms the courier placed the package inside.
 POST {{baseUrl}}/api/orders/{{orderPublicId}}/deposit/
 Authorization: Bearer {{deviceAccessToken}}
+Idempotency-Key: {{depositIdempotencyKey}}
 
 
 ### 12. Customer sees the ready-for-pickup notification.
@@ -129,16 +138,14 @@ Authorization: Bearer {{customerAccessToken}}
 ### 14. Locker device scans the QR token and receives an open-drawer command.
 POST {{baseUrl}}/api/lockers/pickup-scan/
 Authorization: Bearer {{deviceAccessToken}}
+Idempotency-Key: {{pickupScanIdempotencyKey}}
 Content-Type: application/json
-
-{
-  "token": "{{pickupQrToken}}"
-}
 
 
 ### 15. Locker device confirms the package was collected.
 POST {{baseUrl}}/api/lockers/orders/{{orderPublicId}}/confirm-collection/
 Authorization: Bearer {{deviceAccessToken}}
+Idempotency-Key: {{collectionIdempotencyKey}}
 
 
 ### 16. Customer verifies that the order is collected.

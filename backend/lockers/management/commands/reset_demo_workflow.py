@@ -4,7 +4,15 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from audit.models import AuditLog
-from lockers.models import Drawer, LockerDevice, LockerEventLog, LockerStation
+
+from lockers.models import (
+    Drawer,
+    LockerDevice,
+    LockerDeviceRequest,
+    LockerEventLog,
+    LockerStation,
+)
+
 from orders.models import Order
 from products.models import Product
 
@@ -132,6 +140,10 @@ class Command(BaseCommand):
 
             deleted_order_count = len(order_ids)
 
+            deleted_receipt_count, _ = LockerDeviceRequest.objects.filter(
+                        order_id__in=order_ids,
+            ).delete()
+
             deleted_event_count, _ = LockerEventLog.objects.filter(
                 order_id__in=order_ids
             ).delete()
@@ -142,6 +154,9 @@ class Command(BaseCommand):
             ).delete()
 
             demo_orders.delete()
+            self.stdout.write(
+                f"Deleted device request receipts: {deleted_receipt_count}"
+            )
 
             for drawer in drawers:
                 drawer.status = Drawer.Status.AVAILABLE

@@ -129,6 +129,68 @@ class LockerDevice(models.Model):
         return f"{self.device_code} -> {self.locker_station.code}"
 
 
+class LockerDeviceRequest(models.Model):
+    class Operation(models.TextChoices):
+        DEPOSIT_CONFIRMATION = (
+            "deposit_confirmation",
+            "Deposit Confirmation",
+        )
+        PICKUP_SCAN = "pickup_scan", "Pickup Scan"
+        COLLECTION_CONFIRMATION = (
+            "collection_confirmation",
+            "Collection Confirmation",
+        )
+
+        RETURN_SCAN = "return_scan", "Return Scan"
+        RETURN_CONFIRMATION = (
+            "return_confirmation",
+            "Return Confirmation",
+        )
+
+    locker_device = models.ForeignKey(
+        LockerDevice,
+        on_delete=models.PROTECT,
+        related_name="request_receipts",
+    )
+    order = models.ForeignKey(
+        "orders.Order",
+        on_delete=models.PROTECT,
+        related_name="device_request_receipts",
+        null=True,
+        blank=True,
+    )
+    operation = models.CharField(
+        max_length=30,
+        choices=Operation.choices,
+    )
+    idempotency_key = models.UUIDField()
+    request_hash = models.CharField(max_length=64)
+    response_status = models.PositiveSmallIntegerField()
+    response_body = models.JSONField(default=dict)
+    processed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-processed_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["locker_device", "idempotency_key"],
+                name="unique_device_request_key",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["locker_device", "operation", "processed_at"]
+            ),
+            models.Index(fields=["order", "processed_at"]),
+        ]
+
+    def __str__(self):
+        return (
+            f"{self.locker_device.device_code} - "
+            f"{self.operation}"
+        )
+
+
 class LockerEventLog(models.Model):
     class EventType(models.TextChoices):
         DRAWER_RESERVED = "drawer_reserved", "Drawer Reserved"
