@@ -20,6 +20,10 @@ class NotificationSerializer(serializers.ModelSerializer):
             "data",
             "order_public_id",
             "is_read",
+            "delivery_status",
+            "delivery_attempts",
+            "delivered_at",
+            "delivery_error",
             "read_at",
             "created_at",
         )
