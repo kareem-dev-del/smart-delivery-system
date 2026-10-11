@@ -1,8 +1,8 @@
 from django.contrib.auth import get_user_model
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
-from django.utils import timezone
 
 from .models import Notification
 
@@ -68,6 +68,27 @@ class NotificationAPIViewTests(APITestCase):
                 read_notification.id,
             },
         )
+
+    def test_notification_list_includes_delivery_tracking_fields(self):
+        self.client.force_authenticate(user=self.customer)
+
+        response = self.client.get(reverse("notification-list"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        notification = response.data["results"][0]
+
+        self.assertIn("delivery_status", notification)
+        self.assertIn("delivery_attempts", notification)
+        self.assertIn("delivered_at", notification)
+        self.assertIn("delivery_error", notification)
+        self.assertEqual(
+            notification["delivery_status"],
+            Notification.DeliveryStatus.PENDING,
+        )
+        self.assertEqual(notification["delivery_attempts"], 0)
+        self.assertIsNone(notification["delivered_at"])
+        self.assertEqual(notification["delivery_error"], "")
 
     def test_user_sees_only_own_unread_notifications(self):
         self.client.force_authenticate(user=self.customer)

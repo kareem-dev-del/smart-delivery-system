@@ -21,6 +21,12 @@ class Notification(models.Model):
             "Courier Return Required",
         )
 
+    class DeliveryStatus(models.TextChoices):
+        PENDING = "pending", "Pending"
+        SENT = "sent", "Sent"
+        FAILED = "failed", "Failed"
+        SKIPPED = "skipped", "Skipped"
+
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -41,6 +47,14 @@ class Notification(models.Model):
     message = models.TextField()
     data = models.JSONField(default=dict, blank=True)
     is_read = models.BooleanField(default=False)
+    delivery_status = models.CharField(
+        max_length=20,
+        choices=DeliveryStatus.choices,
+        default=DeliveryStatus.PENDING,
+    )
+    delivery_attempts = models.PositiveSmallIntegerField(default=0)
+    delivered_at = models.DateTimeField(null=True, blank=True)
+    delivery_error = models.TextField(blank=True)
     read_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -49,6 +63,7 @@ class Notification(models.Model):
         indexes = [
             models.Index(fields=["user", "is_read", "created_at"]),
             models.Index(fields=["order", "created_at"]),
+            models.Index(fields=["delivery_status", "created_at"]),
         ]
 
     def __str__(self):
