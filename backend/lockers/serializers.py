@@ -237,6 +237,10 @@ class AdminLockerDeviceSerializer(serializers.ModelSerializer):
 
 class AdminDashboardSummarySerializer(serializers.Serializer):
     generated_at = serializers.DateTimeField(read_only=True)
+    totals = serializers.DictField(
+        child=serializers.IntegerField(min_value=0),
+        read_only=True,
+    )
 
     orders_by_status = serializers.DictField(
         child=serializers.IntegerField(min_value=0),
@@ -253,8 +257,16 @@ class AdminDashboardSummarySerializer(serializers.Serializer):
     devices_by_connection_status = serializers.DictField(
         child=serializers.IntegerField(min_value=0),
         read_only=True,
-    )      
+    )
 
+    notifications_by_delivery_status = serializers.DictField(
+        child=serializers.IntegerField(min_value=0),
+        read_only=True,
+    )
+    action_required = serializers.DictField(
+        child=serializers.IntegerField(min_value=0),
+        read_only=True,
+    )
 
 class LockerDeviceActivationSerializer(serializers.Serializer):
     is_active = serializers.BooleanField()     
