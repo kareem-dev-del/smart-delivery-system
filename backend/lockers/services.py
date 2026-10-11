@@ -238,24 +238,25 @@ def get_locker_device_connection_status(*, locker_device, now=None):
     return LockerDevice.ConnectionStatus.ONLINE
 
 
-def get_status_counts(*, model, choices):
+def get_status_counts(*, model, choices, field_name="status"):
     counts = {
         value: 0
         for value, _label in choices
     }
 
     grouped_counts = (
-        model.objects.values("status")
+        model.objects.values(field_name)
         .annotate(count=Count("id"))
     )
 
     for item in grouped_counts:
-        counts[item["status"]] = item["count"]
+        counts[item[field_name]] = item["count"]
 
     return counts
 
 
 def get_admin_dashboard_summary(*, now=None):
+    from notifications.models import Notification
     from orders.models import Order
 
     now = now or timezone.now()
@@ -291,6 +292,63 @@ def get_admin_dashboard_summary(*, now=None):
             filter=Q(is_active=False),
         ),
     )
+
+    unhealthy_device_count = (
+        device_counts["stale"]
+        + device_counts["never_connected"]
+        + device_counts["inactive"]
+    )
+
+    return {
+        "generated_at": now,
+        "totals": {
+            "orders": Order.objects.count(),
+            "locker_stations": LockerStation.objects.count(),
+            "drawers": Drawer.objects.count(),
+            "locker_devices": LockerDevice.objects.count(),
+            "notifications": Notification.objects.count(),
+        },
+        "orders_by_status": get_status_counts(
+            model=Order,
+            choices=Order.Status.choices,
+        ),
+        "locker_stations_by_status": get_status_counts(
+            model=LockerStation,
+            choices=LockerStation.Status.choices,
+        ),
+        "drawers_by_status": get_status_counts(
+            model=Drawer,
+            choices=Drawer.Status.choices,
+        ),
+        "devices_by_connection_status": {
+            LockerDevice.ConnectionStatus.ONLINE: device_counts["online"],
+            LockerDevice.ConnectionStatus.STALE: device_counts["stale"],
+            LockerDevice.ConnectionStatus.NEVER_CONNECTED: (
+                device_counts["never_connected"]
+            ),
+            LockerDevice.ConnectionStatus.INACTIVE: device_counts["inactive"],
+        },
+        "notifications_by_delivery_status": get_status_counts(
+            model=Notification,
+            choices=Notification.DeliveryStatus.choices,
+            field_name="delivery_status",
+        ),
+        "action_required": {
+            "awaiting_locker_orders": Order.objects.filter(
+                status=Order.Status.AWAITING_LOCKER,
+            ).count(),
+            "expired_orders": Order.objects.filter(
+                status=Order.Status.EXPIRED,
+            ).count(),
+            "failed_notifications": Notification.objects.filter(
+                delivery_status=Notification.DeliveryStatus.FAILED,
+            ).count(),
+            "pending_notifications": Notification.objects.filter(
+                delivery_status=Notification.DeliveryStatus.PENDING,
+            ).count(),
+            "unhealthy_devices": unhealthy_device_count,
+        },
+    }
 
     return {
         "generated_at": now,

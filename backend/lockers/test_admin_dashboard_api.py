@@ -10,6 +10,8 @@ from rest_framework.test import APITestCase
 from accounts.models import UserProfile
 from orders.models import Order
 
+from notifications.models import Notification
+
 from .models import Drawer, LockerDevice, LockerStation
 
 
@@ -71,6 +73,27 @@ class AdminDashboardSummaryAPIViewTests(APITestCase):
             locker_station=self.online_locker,
             status=Order.Status.READY_FOR_PICKUP,
         )
+        Order.objects.create(
+            customer=self.customer,
+            status=Order.Status.EXPIRED,
+        )
+
+        Notification.objects.create(
+            user=self.customer,
+            notification_type=Notification.Type.ORDER_READY_FOR_PICKUP,
+            title="Ready",
+            message="Order is ready.",
+        )
+        Notification.objects.create(
+            user=self.customer,
+            notification_type=Notification.Type.ORDER_PICKUP_EXPIRED,
+            title="Failed notification",
+            message="Email failed.",
+            delivery_status=Notification.DeliveryStatus.FAILED,
+            delivery_error="SMTP error",
+        )
+
+
 
     def create_locker_device(
         self,
@@ -135,6 +158,13 @@ class AdminDashboardSummaryAPIViewTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+        self.assertEqual(response.data["totals"]["orders"], 3)
+        self.assertEqual(response.data["totals"]["locker_stations"], 4)
+        self.assertEqual(response.data["totals"]["drawers"], 2)
+        self.assertEqual(response.data["totals"]["locker_devices"], 4)
+        self.assertEqual(response.data["totals"]["notifications"], 2)
+
+
         self.assertEqual(
             response.data["orders_by_status"][
                 Order.Status.AWAITING_LOCKER
@@ -147,6 +177,12 @@ class AdminDashboardSummaryAPIViewTests(APITestCase):
             ],
             1,
         )
+
+        self.assertEqual(
+            response.data["orders_by_status"][Order.Status.EXPIRED],
+            1,
+        )
+
         self.assertEqual(
             response.data["drawers_by_status"][
                 Drawer.Status.AVAILABLE
@@ -182,4 +218,37 @@ class AdminDashboardSummaryAPIViewTests(APITestCase):
                 LockerDevice.ConnectionStatus.INACTIVE
             ],
             1,
+        )
+
+        self.assertEqual(
+            response.data["notifications_by_delivery_status"][
+                Notification.DeliveryStatus.PENDING
+            ],
+            1,
+        )
+        self.assertEqual(
+            response.data["notifications_by_delivery_status"][
+                Notification.DeliveryStatus.FAILED
+            ],
+            1,
+        )
+        self.assertEqual(
+            response.data["action_required"]["awaiting_locker_orders"],
+            1,
+        )
+        self.assertEqual(
+            response.data["action_required"]["expired_orders"],
+            1,
+        )
+        self.assertEqual(
+            response.data["action_required"]["failed_notifications"],
+            1,
+        )
+        self.assertEqual(
+            response.data["action_required"]["pending_notifications"],
+            1,
+        )
+        self.assertEqual(
+            response.data["action_required"]["unhealthy_devices"],
+            3,
         )
