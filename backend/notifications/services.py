@@ -3,6 +3,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from .models import Notification
+from .tasks import deliver_notification_email_task
 
 
 def create_notification(
@@ -34,7 +35,7 @@ def create_notification(
                 }
             )
 
-    return Notification.objects.create(
+    notification = Notification.objects.create(
         user=user,
         order=order,
         notification_type=notification_type,
@@ -42,6 +43,12 @@ def create_notification(
         message=message,
         data=dict(data or {}),
     )
+
+    transaction.on_commit(
+        lambda: deliver_notification_email_task.delay(notification.id)
+    )
+
+    return notification
 
 
 @transaction.atomic
