@@ -683,3 +683,127 @@ button { cursor: pointer; }
     flex-direction: column;
   }
 }
+
+.icon-text-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--foreground);
+  border-radius: 0.55rem;
+  min-height: 2.5rem;
+  padding: 0 0.9rem;
+  font-size: 0.9rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.icon-text-button:hover {
+  background: var(--accent);
+}
+
+.compact-status-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.empty-panel {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  border: 1px solid var(--border);
+  background: var(--card);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  color: var(--muted-foreground);
+}
+
+.table-shell {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--card);
+}
+
+.data-table {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.data-table th,
+.data-table td {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.data-table th {
+  color: var(--muted-foreground);
+  background: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.data-table tbody tr:hover {
+  background: var(--accent);
+}
+
+.data-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.mono-cell {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+  font-size: 0.85rem;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.22rem 0.6rem;
+  font-size: 0.78rem;
+  font-weight: 750;
+  background: rgba(15, 23, 42, 0.08);
+  color: var(--foreground);
+}
+
+.status-collected {
+  background: rgba(34, 197, 94, 0.14);
+  color: rgb(22, 101, 52);
+}
+
+.status-ready_for_pickup,
+.status-assigned,
+.status-awaiting_locker {
+  background: rgba(245, 158, 11, 0.16);
+  color: rgb(146, 64, 14);
+}
+
+.status-expired,
+.status-cancelled,
+.status-returned {
+  background: rgba(239, 68, 68, 0.13);
+  color: rgb(153, 27, 27);
+}
+
+@media (max-width: 900px) {
+  .compact-status-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .compact-status-grid {
+    grid-template-columns: 1fr;
+  }
+}
