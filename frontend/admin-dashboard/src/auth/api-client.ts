@@ -3,7 +3,7 @@ import type { AuthTokens, LoginResponse, User } from './types';
 const env = import.meta.env;
 const API_BASE_URL = (env.VITE_API_BASE_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
 const LOGIN_PATH = env.VITE_AUTH_LOGIN_PATH || '/api/token/';
-const CURRENT_USER_PATH = env.VITE_AUTH_CURRENT_USER_PATH || '/api/users/me/';
+const CURRENT_USER_PATH = env.VITE_AUTH_CURRENT_USER_PATH || '/api/accounts/me/';
 
 async function request<T>(path: string, init: RequestInit): Promise<T> {
   let response: Response;
