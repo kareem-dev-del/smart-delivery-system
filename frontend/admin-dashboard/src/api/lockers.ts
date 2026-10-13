@@ -56,3 +56,29 @@ export async function getLockerDevices(
 ): Promise<LockerDevice[]> {
   return requestJson<LockerDevice[]>("/api/lockers/admin/devices/", accessToken);
 }
+
+export async function updateLockerDeviceActivation(
+  accessToken: string,
+  deviceId: number,
+  isActive: boolean,
+): Promise<LockerDevice> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/lockers/admin/devices/${deviceId}/activation/`,
+    {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ is_active: isActive }),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `Device activation request failed (${response.status} ${response.statusText}).`,
+    );
+  }
+
+  return response.json() as Promise<LockerDevice>;
+}

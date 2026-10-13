@@ -11,9 +11,13 @@ import {
 import {
   getLockerDevices,
   getLockerStations,
+  updateLockerDeviceActivation,
   type LockerDevice,
   type LockerStation,
 } from "../api/lockers";
+
+
+
 import { useAuth } from "../auth/AuthProvider";
 
 function formatLabel(value: string): string {
@@ -63,6 +67,35 @@ export function LockersPage() {
       setLoading(false);
     }
   }
+
+  async function handleDeviceActivationToggle(device: LockerDevice) {
+  if (!tokens?.access) {
+    setError("Missing access token. Please sign in again.");
+    return;
+  }
+
+  setError(null);
+
+  try {
+    const updatedDevice = await updateLockerDeviceActivation(
+      tokens.access,
+      device.id,
+      !device.is_active,
+    );
+
+    setDevices((currentDevices) =>
+      currentDevices.map((currentDevice) =>
+        currentDevice.id === updatedDevice.id ? updatedDevice : currentDevice,
+      ),
+    );
+  } catch (caughtError) {
+    setError(
+      caughtError instanceof Error
+        ? caughtError.message
+        : "Could not update device activation.",
+    );
+  }
+}
 
   useEffect(() => {
     void loadLockers();
@@ -256,6 +289,7 @@ export function LockersPage() {
                       <th>Device</th>
                       <th>Locker</th>
                       <th>Active</th>
+                      <th>Action</th>
                       <th>Connection</th>
                       <th>Last heartbeat</th>
                       <th>Updated</th>
@@ -268,8 +302,28 @@ export function LockersPage() {
                           <span className="mono-cell">{device.device_code}</span>
                         </td>
                         <td>{device.locker_name}</td>
-                        <td>{device.is_active ? "Yes" : "No"}</td>
                         <td>
+                        <span
+                          className={`state-pill ${
+                            device.is_active ? "state-pill-active" : "state-pill-inactive"
+                          }`}
+                        >
+                          {device.is_active ? "Active" : "Inactive"}
+                        </span>
+                      </td>
+                        <td>
+                        <button
+                        className={`table-action-button ${
+                          device.is_active ? "table-action-danger" : "table-action-success"
+                        }`}
+                        type="button"
+                        onClick={() => handleDeviceActivationToggle(device)}
+                      >
+                        {device.is_active ? "Deactivate" : "Activate"}
+                      </button>
+                      </td>
+                        <td>
+
                           <span
                             className={`status-badge status-${device.connection_status}`}
                           >
