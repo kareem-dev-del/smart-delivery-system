@@ -7,6 +7,7 @@ import { ComingNextPage } from './pages/ComingNextPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { OrdersPage } from './pages/OrdersPage';
 
 function IndexRedirect() {
   const { user, isAdmin, ready } = useAuth();
@@ -26,7 +27,7 @@ function App() {
             <Route element={<AdminRoute />}>
               <Route element={<AppLayout />}>
                 <Route path="/dashboard" element={<DashboardPage />} />
-                <Route path="/orders" element={<ComingNextPage />} />
+                <Route path="/orders" element={<OrdersPage />} />
                 <Route path="/lockers" element={<ComingNextPage />} />
                 <Route path="/devices" element={<ComingNextPage />} />
                 <Route path="/notifications" element={<ComingNextPage />} />
