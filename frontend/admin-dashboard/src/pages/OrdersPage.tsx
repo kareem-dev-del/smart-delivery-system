@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { AlertTriangle, ClipboardList, Package, RefreshCw } from "lucide-react";
 
 import { getAdminOrders, type AdminOrder } from "../api/orders";
@@ -99,8 +100,11 @@ export function OrdersPage() {
       )}
 
       {!loading && !error && (
-        <>
-          <section aria-labelledby="orders-summary-heading">
+        <div className="orders-page-shell">
+          <section
+            className="orders-summary-panel"
+            aria-labelledby="orders-summary-heading"
+          >
             <h2 id="orders-summary-heading" className="section-heading">
               Order summary
             </h2>
@@ -111,14 +115,19 @@ export function OrdersPage() {
             <div className="status-grid compact-status-grid">
               {Object.entries(statusCounts).map(([status, value]) => (
                 <article className="status-panel" key={status}>
-                  <h3 className="status-panel-title">{formatStatus(status)}</h3>
+                  <h3 className="status-panel-title">
+                    {formatStatus(status)}
+                  </h3>
                   <div className="metric-value">{value}</div>
                 </article>
               ))}
             </div>
           </section>
 
-          <section aria-labelledby="orders-table-heading">
+          <section
+            className="orders-table-panel"
+            aria-labelledby="orders-table-heading"
+          >
             <h2 id="orders-table-heading" className="section-heading">
               Order list
             </h2>
@@ -151,12 +160,17 @@ export function OrdersPage() {
                     {orders.map((order) => (
                       <tr key={order.public_id}>
                         <td>
-                          <span className="mono-cell">
+                          <Link
+                            className="order-link mono-cell"
+                            to={`/orders/${order.public_id}`}
+                          >
                             {order.public_id.slice(0, 8)}
-                          </span>
+                          </Link>
                         </td>
                         <td>
-                          <span className={`status-badge status-${order.status}`}>
+                          <span
+                            className={`status-badge status-${order.status}`}
+                          >
                             {formatStatus(order.status)}
                           </span>
                         </td>
@@ -174,7 +188,7 @@ export function OrdersPage() {
               </div>
             )}
           </section>
-        </>
+        </div>
       )}
     </>
   );
