@@ -9,6 +9,17 @@ export interface LockerStation {
   available_drawers_count: number;
 }
 
+export interface Drawer {
+  id: number;
+  number: number;
+  size: string;
+  status: string;
+}
+
+export interface LockerStationDetail extends LockerStation {
+  drawers: Drawer[];
+}
+
 export interface LockerDevice {
   id: number;
   locker_station_id: number;
@@ -51,6 +62,13 @@ export async function getLockerStations(
   return requestJson<LockerStation[]>("/api/lockers/", accessToken);
 }
 
+export async function getLockerStationDetail(
+  accessToken: string,
+  stationId: number,
+): Promise<LockerStationDetail> {
+  return requestJson<LockerStationDetail>(`/api/lockers/${stationId}/`, accessToken);
+}
+
 export async function getLockerDevices(
   accessToken: string,
 ): Promise<LockerDevice[]> {
@@ -81,4 +99,30 @@ export async function updateLockerDeviceActivation(
   }
 
   return response.json() as Promise<LockerDevice>;
+}
+
+export async function updateDrawerMaintenanceStatus(
+  accessToken: string,
+  drawerId: number,
+  status: "available" | "out_of_service",
+): Promise<Drawer> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/lockers/admin/drawers/${drawerId}/maintenance-status/`,
+    {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ status }),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `Drawer maintenance request failed (${response.status} ${response.statusText}).`,
+    );
+  }
+
+  return response.json() as Promise<Drawer>;
 }
