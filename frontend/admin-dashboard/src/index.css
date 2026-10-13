@@ -1151,3 +1151,63 @@ button { cursor: pointer; }
 .orders-table-panel .data-table td {
   padding: 1rem;
 }
+
+.table-action-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  background: #ffffff;
+  color: var(--foreground);
+  border-radius: 999px;
+  min-height: 2rem;
+  padding: 0 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.table-action-button:hover {
+  background: var(--accent);
+}
+
+.state-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  min-height: 1.8rem;
+  padding: 0 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.state-pill-active {
+  background: rgba(34, 197, 94, 0.14);
+  color: rgb(22, 101, 52);
+}
+
+.state-pill-inactive {
+  background: rgba(100, 116, 139, 0.16);
+  color: rgb(71, 85, 105);
+}
+
+.table-action-success {
+  border-color: rgba(34, 197, 94, 0.35);
+  background: rgba(34, 197, 94, 0.12);
+  color: rgb(22, 101, 52);
+}
+
+.table-action-success:hover {
+  background: rgba(34, 197, 94, 0.2);
+}
+
+.table-action-danger {
+  border-color: rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.1);
+  color: rgb(153, 27, 27);
+}
+
+.table-action-danger:hover {
+  background: rgba(239, 68, 68, 0.17);
+}
