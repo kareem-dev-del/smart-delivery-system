@@ -9,6 +9,7 @@ import { LoginPage } from './pages/LoginPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { OrdersPage } from './pages/OrdersPage';
 import { OrderDetailsPage } from './pages/OrderDetailsPage';
+import { LockersPage } from './pages/LockersPage';
 
 function IndexRedirect() {
   const { user, isAdmin, ready } = useAuth();
@@ -30,7 +31,7 @@ function App() {
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/orders" element={<OrdersPage />} />
                 <Route path="/orders/:publicId" element={<OrderDetailsPage />} />
-                <Route path="/lockers" element={<ComingNextPage />} />
+                <Route path="/lockers" element={<LockersPage />} />
                 <Route path="/devices" element={<ComingNextPage />} />
                 <Route path="/notifications" element={<ComingNextPage />} />
                 <Route path="/audit-log" element={<ComingNextPage />} />
