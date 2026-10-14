@@ -3,10 +3,13 @@ from rest_framework.exceptions import NotFound
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from accounts.permissions import IsAdminRole
 
 from .models import Notification
 from .pagination import NotificationPagination
 from .serializers import (
+    AdminNotificationListFilterSerializer,
+    AdminNotificationSerializer,
     NotificationListFilterSerializer,
     NotificationSerializer,
     NotificationMarkAllReadResponseSerializer,
@@ -41,6 +44,47 @@ class NotificationListAPIView(generics.ListAPIView):
            queryset = queryset.filter(is_read=not unread)
 
         return queryset
+
+
+
+class AdminNotificationListAPIView(generics.ListAPIView):
+    serializer_class = AdminNotificationSerializer
+    pagination_class = NotificationPagination
+    permission_classes = [IsAdminRole]
+
+    def get_queryset(self):
+        filter_serializer = AdminNotificationListFilterSerializer(
+            data=self.request.query_params,
+        )
+        filter_serializer.is_valid(raise_exception=True)
+
+        filters = filter_serializer.validated_data
+
+        queryset = (
+            Notification.objects.select_related("user", "order")
+            .order_by("-created_at")
+        )
+
+        if "delivery_status" in filters:
+            queryset = queryset.filter(
+                delivery_status=filters["delivery_status"],
+            )
+
+        if "notification_type" in filters:
+            queryset = queryset.filter(
+                notification_type=filters["notification_type"],
+            )
+        if "unread" in self.request.query_params:
+            queryset = queryset.filter(
+                is_read=not filters["unread"],
+            )
+
+        return queryset
+
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        response["Cache-Control"] = "no-store"
+        return response
 
 @extend_schema(
     tags=["Notifications"],

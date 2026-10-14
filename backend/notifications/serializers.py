@@ -35,3 +35,33 @@ class NotificationMarkAllReadResponseSerializer(serializers.Serializer):
 
 class NotificationListFilterSerializer(serializers.Serializer):
     unread = serializers.BooleanField(required=False)
+
+
+class AdminNotificationSerializer(NotificationSerializer):
+    recipient = serializers.IntegerField(
+        source="user_id",
+        read_only=True,
+    )
+    recipient_username = serializers.CharField(
+        source="user.username",
+        read_only=True,
+    )
+
+    class Meta(NotificationSerializer.Meta):
+        fields = NotificationSerializer.Meta.fields + (
+            "recipient",
+            "recipient_username",
+        )
+        read_only_fields = fields
+
+
+class AdminNotificationListFilterSerializer(serializers.Serializer):
+    delivery_status = serializers.ChoiceField(
+        choices=Notification.DeliveryStatus.choices,
+        required=False,
+    )
+    notification_type = serializers.ChoiceField(
+        choices=Notification.Type.choices,
+        required=False,
+    )
+    unread = serializers.BooleanField(required=False)

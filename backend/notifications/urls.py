@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    AdminNotificationListAPIView,
     NotificationListAPIView,
     NotificationMarkAllReadAPIView,
     NotificationMarkReadAPIView,
@@ -8,6 +9,11 @@ from .views import (
 
 
 urlpatterns = [
+    path(
+        "admin/",
+        AdminNotificationListAPIView.as_view(),
+        name="admin-notification-list",
+    ),
     path("", NotificationListAPIView.as_view(), name="notification-list"),
     path(
         "read-all/",
