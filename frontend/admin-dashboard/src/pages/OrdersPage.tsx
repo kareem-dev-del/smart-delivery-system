@@ -1,21 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
+import { formatDate, formatLabel } from "../lib/format";
 import { Link } from "react-router-dom";
 import { AlertTriangle, ClipboardList, Package, RefreshCw } from "lucide-react";
 
 import { getAdminOrders, type AdminOrder } from "../api/orders";
 import { useAuth } from "../auth/AuthProvider";
 
-function formatStatus(status: string): string {
-  return status
-    .split("_")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
 
-function formatDate(value: string | null): string {
-  if (!value) return "-";
-  return new Date(value).toLocaleString();
-}
 
 function getOrderItemsSummary(order: AdminOrder): string {
   if (order.items.length === 0) return "No items";
@@ -116,7 +107,7 @@ export function OrdersPage() {
               {Object.entries(statusCounts).map(([status, value]) => (
                 <article className="status-panel" key={status}>
                   <h3 className="status-panel-title">
-                    {formatStatus(status)}
+                    {formatLabel(status)}
                   </h3>
                   <div className="metric-value">{value}</div>
                 </article>
@@ -171,7 +162,7 @@ export function OrdersPage() {
                           <span
                             className={`status-badge status-${order.status}`}
                           >
-                            {formatStatus(order.status)}
+                            {formatLabel(order.status)}
                           </span>
                         </td>
                         <td>{order.customer_username}</td>

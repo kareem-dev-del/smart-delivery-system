@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { formatDate, formatLabel } from "../lib/format";
 import { Link, useParams } from "react-router-dom";
 import {
   AlertTriangle,
@@ -12,17 +13,7 @@ import {
 import { getAdminOrders, type AdminOrder } from "../api/orders";
 import { useAuth } from "../auth/AuthProvider";
 
-function formatStatus(status: string): string {
-  return status
-    .split("_")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
 
-function formatDate(value: string | null): string {
-  if (!value) return "-";
-  return new Date(value).toLocaleString();
-}
 
 function DetailRow({
   label,
@@ -145,7 +136,7 @@ export function OrderDetailsPage() {
                 {order.public_id}
               </h2>
               <span className={`status-badge status-${order.status}`}>
-                {formatStatus(order.status)}
+                {formatLabel(order.status)}
               </span>
             </div>
 
