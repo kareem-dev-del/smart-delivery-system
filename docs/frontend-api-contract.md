@@ -673,7 +673,37 @@ PATCH /api/lockers/admin/devices/{device_id}/activation/
 Authorization: Bearer <admin_access_token>
 ```
 
-### 9.8 Audit Log
+
+
+
+### 9.8 Admin Notifications Monitoring
+
+Screen: Admin notification delivery monitoring.
+
+```http
+GET /api/notifications/admin/
+Authorization: Bearer <admin_access_token>
+```
+
+This endpoint is restricted to administrators. It returns notifications for all recipients, including delivery tracking and recipient details.
+
+Supported filters:
+
+```http
+GET /api/notifications/admin/?delivery_status=failed
+GET /api/notifications/admin/?notification_type=order_ready_for_pickup
+GET /api/notifications/admin/?unread=true
+```
+
+Admin-only response fields in addition to the standard notification fields:
+
+- `recipient`
+- `recipient_username`
+- `delivery_status`
+- `delivery_attempts`
+- `delivered_at`
+- `delivery_error`
+### 9.9 Audit Log
 
 Screen: Admin audit log.
 
@@ -690,7 +720,6 @@ GET /api/audit/?target_type=order
 GET /api/audit/?actor_id=1
 GET /api/audit/?target_id=<uuid>
 ```
-
 ## 10. Locker Device APIs
 
 The locker machine can be real hardware, tablet UI, or simulation screen.
