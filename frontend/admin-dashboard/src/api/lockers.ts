@@ -1,3 +1,5 @@
+import { apiGet, apiPatch } from "./client";
+
 export interface LockerStation {
   id: number;
   name: string;
@@ -7,6 +9,17 @@ export interface LockerStation {
   longitude: string;
   status: string;
   available_drawers_count: number;
+}
+
+export interface Drawer {
+  id: number;
+  number: number;
+  size: string;
+  status: string;
+}
+
+export interface LockerStationDetail extends LockerStation {
+  drawers: Drawer[];
 }
 
 export interface LockerDevice {
@@ -23,62 +36,48 @@ export interface LockerDevice {
   updated_at: string;
 }
 
-const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000"
-).replace(/\/$/, "");
-
-async function requestJson<T>(path: string, accessToken: string): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      `Lockers request failed (${response.status} ${response.statusText}).`,
-    );
-  }
-
-  return response.json() as Promise<T>;
-}
-
-export async function getLockerStations(
+export function getLockerStations(
   accessToken: string,
 ): Promise<LockerStation[]> {
-  return requestJson<LockerStation[]>("/api/lockers/", accessToken);
+  return apiGet<LockerStation[]>("/api/lockers/", accessToken);
 }
 
-export async function getLockerDevices(
+export function getLockerStationDetail(
+  accessToken: string,
+  stationId: number,
+): Promise<LockerStationDetail> {
+  return apiGet<LockerStationDetail>(
+    `/api/lockers/${stationId}/`,
+    accessToken,
+  );
+}
+
+export function getLockerDevices(
   accessToken: string,
 ): Promise<LockerDevice[]> {
-  return requestJson<LockerDevice[]>("/api/lockers/admin/devices/", accessToken);
+  return apiGet<LockerDevice[]>("/api/lockers/admin/devices/", accessToken);
 }
 
-export async function updateLockerDeviceActivation(
+export function updateLockerDeviceActivation(
   accessToken: string,
   deviceId: number,
   isActive: boolean,
 ): Promise<LockerDevice> {
-  const response = await fetch(
-    `${API_BASE_URL}/api/lockers/admin/devices/${deviceId}/activation/`,
-    {
-      method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ is_active: isActive }),
-    },
+  return apiPatch<LockerDevice>(
+    `/api/lockers/admin/devices/${deviceId}/activation/`,
+    accessToken,
+    { is_active: isActive },
   );
+}
 
-  if (!response.ok) {
-    throw new Error(
-      `Device activation request failed (${response.status} ${response.statusText}).`,
-    );
-  }
-
-  return response.json() as Promise<LockerDevice>;
+export function updateDrawerMaintenanceStatus(
+  accessToken: string,
+  drawerId: number,
+  status: "available" | "out_of_service",
+): Promise<Drawer> {
+  return apiPatch<Drawer>(
+    `/api/lockers/admin/drawers/${drawerId}/maintenance-status/`,
+    accessToken,
+    { status },
+  );
 }

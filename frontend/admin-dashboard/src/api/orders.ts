@@ -1,3 +1,5 @@
+import { apiGet } from "./client";
+
 export interface OrderItem {
   product: number;
   product_name: string;
@@ -49,26 +51,8 @@ export interface AdminOrdersResponse {
   results: AdminOrder[];
 }
 
-const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000"
-).replace(/\/$/, "");
-
-export async function getAdminOrders(
+export function getAdminOrders(
   accessToken: string,
 ): Promise<AdminOrdersResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/orders/admin/`, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      `Orders request failed (${response.status} ${response.statusText}).`,
-    );
-  }
-
-  return response.json() as Promise<AdminOrdersResponse>;
+  return apiGet<AdminOrdersResponse>("/api/orders/admin/", accessToken);
 }

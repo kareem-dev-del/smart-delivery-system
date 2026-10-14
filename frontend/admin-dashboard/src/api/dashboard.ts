@@ -1,3 +1,5 @@
+import { apiGet } from "./client";
+
 export interface DashboardSummary {
   generated_at: string;
   totals: {
@@ -21,26 +23,11 @@ export interface DashboardSummary {
   };
 }
 
-const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000"
-).replace(/\/$/, "");
-
-export async function getDashboardSummary(
+export function getDashboardSummary(
   accessToken: string,
 ): Promise<DashboardSummary> {
-  const response = await fetch(`${API_BASE_URL}/api/lockers/admin/dashboard/`, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      `Dashboard request failed (${response.status} ${response.statusText}).`,
-    );
-  }
-
-  return response.json() as Promise<DashboardSummary>;
+  return apiGet<DashboardSummary>(
+    "/api/lockers/admin/dashboard/",
+    accessToken,
+  );
 }
