@@ -59,6 +59,26 @@ export function OrdersPage() {
     }, {});
   }, [orders]);
 
+  const orderMetrics = useMemo(() => {
+  const inProgress =
+    (statusCounts.pending ?? 0) +
+    (statusCounts.awaiting_locker ?? 0) +
+    (statusCounts.assigned ?? 0) +
+    (statusCounts.ready_for_pickup ?? 0);
+
+  const readyForPickup = statusCounts.ready_for_pickup ?? 0;
+  const completed = statusCounts.collected ?? 0;
+  const needsAction =
+    (statusCounts.expired ?? 0) + (statusCounts.cancelled ?? 0);
+
+  return {
+    inProgress,
+    readyForPickup,
+    completed,
+    needsAction,
+  };
+}, [statusCounts]);
+
   return (
     <>
       <div className="dashboard-intro">
@@ -92,29 +112,52 @@ export function OrdersPage() {
 
       {!loading && !error && (
         <div className="orders-page-shell">
-          <section
-            className="orders-summary-panel"
-            aria-labelledby="orders-summary-heading"
-          >
-            <h2 id="orders-summary-heading" className="section-heading">
-              Order summary
-            </h2>
-            <p className="section-subtitle">
-              {count} total order{count === 1 ? "" : "s"} returned by the API.
-            </p>
 
-            <div className="status-grid compact-status-grid">
-              {Object.entries(statusCounts).map(([status, value]) => (
-                <article className="status-panel" key={status}>
-                  <h3 className="status-panel-title">
-                    {formatLabel(status)}
-                  </h3>
-                  <div className="metric-value">{value}</div>
-                </article>
-              ))}
+          <section className="orders-command-panel">
+            <div>
+              <p className="eyebrow">Orders command</p>
+              <h2>Order Operations</h2>
+              <span>
+                Live order workload, fulfillment state, and operational focus.
+              </span>
+            </div>
+
+            <div className="orders-command-metrics">
+              <div>
+                <span>Total</span>
+                <strong>{count}</strong>
+              </div>
+              <div>
+                <span>In progress</span>
+                <strong>{orderMetrics.inProgress}</strong>
+              </div>
+              <div>
+                <span>Ready</span>
+                <strong>{orderMetrics.readyForPickup}</strong>
+              </div>
+              <div>
+                <span>Completed</span>
+                <strong>{orderMetrics.completed}</strong>
+              </div>
+            </div>
+
+            <div
+              className={
+                orderMetrics.needsAction > 0
+                  ? "orders-focus orders-focus-warning"
+                  : "orders-focus orders-focus-clear"
+              }
+            >
+              <strong>
+                {orderMetrics.needsAction > 0 ? "Needs review" : "All clear"}
+              </strong>
+              <span>
+                {orderMetrics.needsAction > 0
+                  ? `${orderMetrics.needsAction} order issue needs attention.`
+                  : "No blocked or expired orders right now."}
+              </span>
             </div>
           </section>
-
           <section
             className="orders-table-panel"
             aria-labelledby="orders-table-heading"
@@ -145,6 +188,7 @@ export function OrdersPage() {
                       <th>Total</th>
                       <th>Created</th>
                       <th>Items</th>
+                      <th>Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -172,6 +216,11 @@ export function OrdersPage() {
                         <td>{order.total_amount}</td>
                         <td>{formatDate(order.created_at)}</td>
                         <td>{getOrderItemsSummary(order)}</td>
+                        <td>
+                          <Link className="table-action-link" to={`/orders/${order.public_id}`}>
+                            Details
+                          </Link>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
