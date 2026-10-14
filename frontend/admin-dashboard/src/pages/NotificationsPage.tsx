@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { formatDate, formatLabel } from "../lib/format";
 import {
   AlertTriangle,
   Bell,
@@ -13,17 +14,7 @@ import {
 } from "../api/notifications";
 import { useAuth } from "../auth/AuthProvider";
 
-function formatLabel(value: string): string {
-  return value
-    .split("_")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
 
-function formatDate(value: string | null): string {
-  if (!value) return "-";
-  return new Date(value).toLocaleString();
-}
 
 function getOrderId(notification: NotificationItem): string {
   return notification.order_public_id ?? "-";
