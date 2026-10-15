@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { formatDate, formatLabel } from "../lib/format";
+import { useAuth } from "../auth/AuthProvider";
 import {
   AlertTriangle,
   Bell,
@@ -9,20 +10,19 @@ import {
 } from "lucide-react";
 
 import {
-  getNotifications,
-  type NotificationItem,
+  getAdminNotifications,
+  type AdminNotification,
 } from "../api/notifications";
-import { useAuth } from "../auth/AuthProvider";
 
 
 
-function getOrderId(notification: NotificationItem): string {
+function getOrderId(notification: AdminNotification): string {
   return notification.order_public_id ?? "-";
 }
 
 export function NotificationsPage() {
   const { tokens } = useAuth();
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [notifications, setNotifications] = useState<AdminNotification[]>([]);
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +38,7 @@ export function NotificationsPage() {
     setError(null);
 
     try {
-      const data = await getNotifications(tokens.access);
+      const data = await getAdminNotifications(tokens.access);
       setNotifications(data.results);
       setCount(data.count);
     } catch (caughtError) {
@@ -81,7 +81,7 @@ export function NotificationsPage() {
           <p className="eyebrow">Network control / Notifications</p>
           <h1 className="page-title">Notifications</h1>
           <p className="page-description">
-            Notification inbox and delivery status for the signed-in user.
+            Platform-wide delivery monitoring for all SmartDrop recipients.
           </p>
         </div>
 
@@ -132,7 +132,7 @@ export function NotificationsPage() {
                 </div>
                 <h3 className="module-title">Total notifications</h3>
                 <p className="module-copy">
-                  Notifications visible to the signed-in account.
+                  Notifications created across the SmartDrop platform.
                 </p>
               </article>
 
@@ -205,7 +205,7 @@ export function NotificationsPage() {
             {notifications.length === 0 ? (
               <div className="empty-panel">
                 <CheckCircle2 size={18} />
-                <span>No notifications found for this account.</span>
+                <span>No platform notifications found.</span>
               </div>
             ) : (
               <div className="table-shell">
@@ -213,6 +213,7 @@ export function NotificationsPage() {
                   <thead>
                     <tr>
                       <th>Notification</th>
+                      <th>Recipient</th>
                       <th>Type</th>
                       <th>Order</th>
                       <th>Read</th>
@@ -231,6 +232,13 @@ export function NotificationsPage() {
                             {notification.message}
                           </span>
                         </td>
+
+                        <td>
+                            <strong>{notification.recipient_username}</strong>
+                            <span className="table-secondary-text">
+                              Recipient ID {notification.recipient}
+                            </span>
+                          </td>
                         <td>{formatLabel(notification.notification_type)}</td>
                         <td>
                           <span className="mono-cell">
