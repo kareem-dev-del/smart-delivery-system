@@ -1,4 +1,5 @@
-from rest_framework import status
+from django.contrib.auth import get_user_model
+from rest_framework import generics, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -7,6 +8,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from drf_spectacular.utils import extend_schema, extend_schema_view
 
 from .serializers import (
+    AdminCourierSerializer,
     AccountProfileSerializer,
     AccountProfileUpdateSerializer,
     CustomerRegistrationSerializer,
@@ -14,6 +16,8 @@ from .serializers import (
     LogoutSerializer,
     AuthenticationResponseSerializer,
 )
+from .models import UserProfile
+from .permissions import IsAdminRole
 
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
@@ -37,6 +41,28 @@ class ThrottledTokenObtainPairView(TokenObtainPairView):
 
 class ThrottledTokenRefreshView(TokenRefreshView):
     throttle_classes = [AuthenticationRateThrottle]
+
+
+User = get_user_model()
+
+
+@extend_schema(
+    tags=["Account Administration"],
+    responses={status.HTTP_200_OK: AdminCourierSerializer(many=True)},
+)
+class AdminCourierListAPIView(generics.ListAPIView):
+    serializer_class = AdminCourierSerializer
+    permission_classes = [IsAdminRole]
+
+    def get_queryset(self):
+        return (
+            User.objects.filter(
+                is_active=True,
+                profile__role=UserProfile.Role.COURIER,
+            )
+            .select_related("profile")
+            .order_by("username")
+        )
 
 
 @extend_schema(
@@ -163,4 +189,4 @@ class LogoutAPIView(APIView):
             status=status.HTTP_205_RESET_CONTENT,
             headers={"Cache-Control": "no-store"},
         )
-    
+

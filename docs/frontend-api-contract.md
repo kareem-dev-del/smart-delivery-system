@@ -572,6 +572,15 @@ Main fields:
 
 ### 9.3 Assign Courier
 
+List active couriers for the assignment selector:
+
+```http
+GET /api/accounts/admin/couriers/
+Authorization: Bearer <admin_access_token>
+```
+
+Each item includes the courier `id`, `username`, profile details, and `role`.
+
 ```http
 POST /api/orders/{public_id}/assign-courier/
 Authorization: Bearer <admin_access_token>

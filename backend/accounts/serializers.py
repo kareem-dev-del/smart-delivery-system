@@ -50,6 +50,10 @@ class AccountProfileSerializer(serializers.ModelSerializer):
         )
 
 
+class AdminCourierSerializer(AccountProfileSerializer):
+    """The courier directory exposed to admin operations screens."""
+
+
 class AuthenticationResponseSerializer(serializers.Serializer):
     user = AccountProfileSerializer(read_only=True)
     access = serializers.CharField(read_only=True)
@@ -253,4 +257,4 @@ class ChangePasswordSerializer(serializers.Serializer):
 class LogoutSerializer(serializers.Serializer):
     refresh = serializers.CharField(
         trim_whitespace=False,
-    )   
+    )
