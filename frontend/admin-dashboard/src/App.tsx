@@ -3,7 +3,7 @@ import { AuthProvider, useAuth } from './auth/AuthProvider';
 import { AppLayout } from './components/AppLayout';
 import { AdminRoute, ProtectedRoute } from './components/ProtectedRoute';
 import { AccessDeniedPage } from './pages/AccessDeniedPage';
-import { ComingNextPage } from './pages/ComingNextPage';
+import { DevicesPage } from './pages/DevicesPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
 import { NotFoundPage } from './pages/NotFoundPage';
@@ -34,7 +34,7 @@ function App() {
                 <Route path="/orders" element={<OrdersPage />} />
                 <Route path="/orders/:publicId" element={<OrderDetailsPage />} />
                 <Route path="/lockers" element={<LockersPage />} />
-                <Route path="/devices" element={<ComingNextPage />} />
+                <Route path="/devices" element={<DevicesPage />} />
                 <Route path="/notifications" element={<NotificationsPage />} />
                 <Route path="/audit-log" element={<AuditLogPage />} />
               </Route>

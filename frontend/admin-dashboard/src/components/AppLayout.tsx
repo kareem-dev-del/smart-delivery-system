@@ -22,7 +22,7 @@ const navItems = [
   { label: "Dashboard", to: "/dashboard", icon: LayoutDashboard, badge: null },
   { label: "Orders", to: "/orders", icon: ClipboardList, badge: null },
   { label: "Lockers", to: "/lockers", icon: Boxes, badge: null },
-  { label: "Devices", to: "/devices", icon: Monitor, badge: "Soon" },
+  { label: "Devices", to: "/devices", icon: Monitor, badge: null },
   { label: "Notifications", to: "/notifications", icon: Bell, badge: null },
   { label: "Audit Log", to: "/audit-log", icon: FileClock, badge: null },
 ];
