@@ -137,3 +137,65 @@ class AccountAPIViewTests(APITestCase):
             self.user.profile.phone,
             "01012345678",
         )
+
+
+class AdminCourierListAPIViewTests(APITestCase):
+    def setUp(self):
+        self.admin_user = User.objects.create_user(
+            username="admin",
+            password="SafePass123!2026",
+        )
+        self.admin_user.profile.role = UserProfile.Role.ADMIN
+        self.admin_user.profile.save(update_fields=("role", "updated_at"))
+
+        self.courier = User.objects.create_user(
+            username="active-courier",
+            password="SafePass123!2026",
+        )
+        self.courier.profile.role = UserProfile.Role.COURIER
+        self.courier.profile.phone = "+201012345678"
+        self.courier.profile.save(update_fields=("role", "phone", "updated_at"))
+
+        self.inactive_courier = User.objects.create_user(
+            username="inactive-courier",
+            password="SafePass123!2026",
+            is_active=False,
+        )
+        self.inactive_courier.profile.role = UserProfile.Role.COURIER
+        self.inactive_courier.profile.save(update_fields=("role", "updated_at"))
+
+    def url(self):
+        return reverse("admin-courier-list")
+
+    def test_admin_can_list_active_couriers(self):
+        self.client.force_authenticate(user=self.admin_user)
+
+        response = self.client.get(self.url())
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.data,
+            [
+                {
+                    "id": self.courier.id,
+                    "username": "active-courier",
+                    "first_name": "",
+                    "last_name": "",
+                    "email": "",
+                    "phone": "+201012345678",
+                    "role": UserProfile.Role.COURIER,
+                }
+            ],
+        )
+
+    def test_non_admin_cannot_list_couriers(self):
+        self.client.force_authenticate(user=self.courier)
+
+        response = self.client.get(self.url())
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_unauthenticated_user_cannot_list_couriers(self):
+        response = self.client.get(self.url())
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)

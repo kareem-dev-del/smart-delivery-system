@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    AdminCourierListAPIView,
     ChangePasswordAPIView,
     CustomerRegistrationAPIView,
     LogoutAPIView,
@@ -9,6 +10,11 @@ from .views import (
 
 
 urlpatterns = [
+    path(
+        "admin/couriers/",
+        AdminCourierListAPIView.as_view(),
+        name="admin-courier-list",
+    ),
     path(
         "register/",
         CustomerRegistrationAPIView.as_view(),
