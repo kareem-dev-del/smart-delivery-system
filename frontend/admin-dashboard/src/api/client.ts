@@ -84,3 +84,15 @@ export function apiPatch<T>(
     body,
   });
 }
+
+export function apiPost<T>(
+  path: string,
+  accessToken: string,
+  body: unknown,
+): Promise<T> {
+  return apiRequest<T>(path, {
+    accessToken,
+    method: "POST",
+    body,
+  });
+}

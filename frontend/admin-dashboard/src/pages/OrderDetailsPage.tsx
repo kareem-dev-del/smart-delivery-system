@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { formatDate, formatLabel } from "../lib/format";
 import { Link, useParams } from "react-router-dom";
 import {
@@ -7,10 +7,16 @@ import {
   ClipboardList,
   Package,
   User,
+  UserRoundPlus,
   Warehouse,
 } from "lucide-react";
 
-import { getAdminOrder, type AdminOrder } from "../api/orders";
+import { getAdminCouriers, type AdminCourier } from "../api/accounts";
+import {
+  assignCourierToOrder,
+  getAdminOrder,
+  type AdminOrder,
+} from "../api/orders";
 import { useAuth } from "../auth/AuthProvider";
 
 
@@ -48,12 +54,22 @@ function TimelineRow({
   );
 }
 
+function getCourierLabel(courier: AdminCourier): string {
+  const fullName = `${courier.first_name} ${courier.last_name}`.trim();
+  return fullName ? `${fullName} (@${courier.username})` : courier.username;
+}
+
 export function OrderDetailsPage() {
   const { publicId } = useParams();
   const { tokens } = useAuth();
   const [order, setOrder] = useState<AdminOrder | null>(null);
+  const [couriers, setCouriers] = useState<AdminCourier[]>([]);
+  const [selectedCourierId, setSelectedCourierId] = useState("");
   const [loading, setLoading] = useState(true);
+  const [assigningCourier, setAssigningCourier] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [assignmentError, setAssignmentError] = useState<string | null>(null);
+  const [assignmentNotice, setAssignmentNotice] = useState<string | null>(null);
 
   async function loadOrder() {
     if (!tokens?.access) {
@@ -72,9 +88,16 @@ export function OrderDetailsPage() {
     setLoading(true);
     setError(null);
 
-        try {
-      const data = await getAdminOrder(tokens.access, publicId);
-      setOrder(data);
+    try {
+      const [orderData, courierData] = await Promise.all([
+        getAdminOrder(tokens.access, publicId),
+        getAdminCouriers(tokens.access),
+      ]);
+      setOrder(orderData);
+      setCouriers(courierData);
+      setSelectedCourierId(
+        orderData.assigned_courier ? String(orderData.assigned_courier) : "",
+      );
     } catch (caughtError) {
       setError(
         caughtError instanceof Error
@@ -93,6 +116,51 @@ export function OrderDetailsPage() {
   const totalItems = useMemo(() => {
     return order?.items.reduce((total, item) => total + item.quantity, 0) ?? 0;
   }, [order]);
+
+  const canAssignCourier = Boolean(
+    order && ["awaiting_locker", "assigned", "expired"].includes(order.status),
+  );
+
+  async function handleCourierAssignment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!tokens?.access || !order || !selectedCourierId) {
+      setAssignmentError("Select an active courier before saving.");
+      return;
+    }
+
+    setAssigningCourier(true);
+    setAssignmentError(null);
+    setAssignmentNotice(null);
+
+    try {
+      const assignment = await assignCourierToOrder(
+        tokens.access,
+        order.public_id,
+        Number(selectedCourierId),
+      );
+
+      setOrder((currentOrder) =>
+        currentOrder
+          ? {
+              ...currentOrder,
+              assigned_courier: assignment.courier_id,
+              assigned_courier_username: assignment.courier_username,
+              courier_assigned_at: assignment.courier_assigned_at,
+            }
+          : currentOrder,
+      );
+      setAssignmentNotice(`${assignment.courier_username} is now assigned.`);
+    } catch (caughtError) {
+      setAssignmentError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Could not assign the courier.",
+      );
+    } finally {
+      setAssigningCourier(false);
+    }
+  }
 
   return (
     <>
@@ -142,6 +210,66 @@ export function OrderDetailsPage() {
               <strong>{order.total_amount}</strong>
             </div>
           </section>
+
+          {canAssignCourier && (
+            <section
+              className="order-assignment-panel"
+              aria-labelledby="courier-assignment-heading"
+            >
+              <div className="order-assignment-copy">
+                <div className="detail-panel-heading">
+                  <UserRoundPlus size={17} />
+                  <h2 id="courier-assignment-heading">Courier assignment</h2>
+                </div>
+                <p>
+                  Choose an active courier to take responsibility for this
+                  order. The assignment is recorded in the audit trail.
+                </p>
+              </div>
+
+              {couriers.length === 0 ? (
+                <p className="assignment-message assignment-message-error">
+                  No active couriers are available for assignment.
+                </p>
+              ) : (
+                <form className="order-assignment-form" onSubmit={handleCourierAssignment}>
+                  <label htmlFor="courier-id">Active courier</label>
+                  <select
+                    id="courier-id"
+                    value={selectedCourierId}
+                    onChange={(event) => setSelectedCourierId(event.target.value)}
+                    disabled={assigningCourier}
+                  >
+                    <option value="">Select a courier</option>
+                    {couriers.map((courier) => (
+                      <option key={courier.id} value={courier.id}>
+                        {getCourierLabel(courier)}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    className="assignment-submit"
+                    type="submit"
+                    disabled={assigningCourier || !selectedCourierId}
+                  >
+                    <UserRoundPlus size={15} />
+                    {assigningCourier ? "Assigning..." : "Assign courier"}
+                  </button>
+                </form>
+              )}
+
+              {assignmentError && (
+                <p className="assignment-message assignment-message-error" role="alert">
+                  {assignmentError}
+                </p>
+              )}
+              {assignmentNotice && (
+                <p className="assignment-message assignment-message-success" role="status">
+                  {assignmentNotice}
+                </p>
+              )}
+            </section>
+          )}
 
           <section className="details-grid" aria-label="Order details">
             <article className="detail-panel">
