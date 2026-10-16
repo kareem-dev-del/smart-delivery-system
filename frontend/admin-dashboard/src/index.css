@@ -1016,6 +1016,100 @@ button { cursor: pointer; }
   align-items: start;
 }
 
+.order-assignment-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.8fr);
+  gap: 1.25rem;
+  max-width: 1180px;
+  margin: 1rem auto 0;
+  padding: 1.15rem 1.25rem;
+  border: 1px solid var(--sd-border);
+  border-radius: 0.75rem;
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.045);
+}
+
+.order-assignment-copy .detail-panel-heading {
+  margin-bottom: 0.45rem;
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.order-assignment-copy h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.order-assignment-copy p,
+.assignment-message {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.order-assignment-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 0.65rem;
+}
+
+.order-assignment-form label {
+  grid-column: 1 / -1;
+  color: var(--foreground);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.order-assignment-form select {
+  min-width: 0;
+  height: 2.65rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--sd-border);
+  border-radius: 0.55rem;
+  background: #ffffff;
+  color: var(--foreground);
+}
+
+.assignment-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 2.65rem;
+  padding: 0 0.85rem;
+  border: 1px solid var(--sd-primary);
+  border-radius: 0.55rem;
+  background: var(--sd-primary);
+  color: #ffffff;
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.assignment-submit:hover:not(:disabled) {
+  background: var(--sd-primary-dark);
+}
+
+.assignment-submit:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.assignment-message {
+  grid-column: 1 / -1;
+}
+
+.assignment-message-error {
+  color: #b42318;
+}
+
+.assignment-message-success {
+  color: #067647;
+}
+
 .detail-panel {
   background: #ffffff;
   border: 1px solid rgba(148, 163, 184, 0.28);
@@ -1082,12 +1176,23 @@ button { cursor: pointer; }
     max-width: none;
   }
 
+  .order-assignment-panel {
+    grid-template-columns: 1fr;
+    max-width: none;
+  }
+
   .details-total {
     border-left: 0;
     border-top: 1px solid var(--border);
     padding-left: 0;
     padding-top: 1rem;
     width: 100%;
+  }
+}
+
+@media (max-width: 560px) {
+  .order-assignment-form {
+    grid-template-columns: 1fr;
   }
 }
 

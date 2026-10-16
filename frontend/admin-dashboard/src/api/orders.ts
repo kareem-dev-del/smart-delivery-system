@@ -1,4 +1,4 @@
-import { apiGet } from "./client";
+import { apiGet, apiPost } from "./client";
 
 export interface OrderItem {
   product: number;
@@ -51,6 +51,13 @@ export interface AdminOrdersResponse {
   results: AdminOrder[];
 }
 
+export interface CourierAssignment {
+  order_public_id: string;
+  courier_id: number;
+  courier_username: string;
+  courier_assigned_at: string;
+}
+
 export function getAdminOrders(
   accessToken: string,
 ): Promise<AdminOrdersResponse> {
@@ -64,5 +71,17 @@ export function getAdminOrder(
   return apiGet<AdminOrder>(
     `/api/orders/${publicId}/`,
     accessToken,
+  );
+}
+
+export function assignCourierToOrder(
+  accessToken: string,
+  publicId: string,
+  courierId: number,
+): Promise<CourierAssignment> {
+  return apiPost<CourierAssignment>(
+    `/api/orders/${publicId}/assign-courier/`,
+    accessToken,
+    { courier_id: courierId },
   );
 }
