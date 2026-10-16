@@ -56,3 +56,13 @@ export function getAdminOrders(
 ): Promise<AdminOrdersResponse> {
   return apiGet<AdminOrdersResponse>("/api/orders/admin/", accessToken);
 }
+
+export function getAdminOrder(
+  accessToken: string,
+  publicId: string,
+): Promise<AdminOrder> {
+  return apiGet<AdminOrder>(
+    `/api/orders/${publicId}/`,
+    accessToken,
+  );
+}
