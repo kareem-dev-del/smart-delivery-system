@@ -10,7 +10,7 @@ import {
   Warehouse,
 } from "lucide-react";
 
-import { getAdminOrders, type AdminOrder } from "../api/orders";
+import { getAdminOrder, type AdminOrder } from "../api/orders";
 import { useAuth } from "../auth/AuthProvider";
 
 
@@ -62,22 +62,19 @@ export function OrderDetailsPage() {
       return;
     }
 
+   if (!publicId) {
+      setError("Missing order identifier.");
+      setOrder(null);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
-    try {
-      const data = await getAdminOrders(tokens.access);
-      const matchedOrder =
-        data.results.find((candidate) => candidate.public_id === publicId) ??
-        null;
-
-      if (!matchedOrder) {
-        setError("Order was not found in the admin order list.");
-        setOrder(null);
-        return;
-      }
-
-      setOrder(matchedOrder);
+        try {
+      const data = await getAdminOrder(tokens.access, publicId);
+      setOrder(data);
     } catch (caughtError) {
       setError(
         caughtError instanceof Error
