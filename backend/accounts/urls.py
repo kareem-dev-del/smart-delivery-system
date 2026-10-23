@@ -1,6 +1,8 @@
 from django.urls import path
 
 from .views import (
+    AdminManagedAccountListCreateAPIView,
+    AdminManagedAccountStatusAPIView,
     AdminCourierListAPIView,
     ChangePasswordAPIView,
     CustomerRegistrationAPIView,
@@ -10,6 +12,16 @@ from .views import (
 
 
 urlpatterns = [
+    path(
+        "admin/users/",
+        AdminManagedAccountListCreateAPIView.as_view(),
+        name="admin-managed-user-list-create",
+    ),
+    path(
+        "admin/users/<int:user_id>/status/",
+        AdminManagedAccountStatusAPIView.as_view(),
+        name="admin-managed-user-status",
+    ),
     path(
         "admin/couriers/",
         AdminCourierListAPIView.as_view(),

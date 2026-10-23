@@ -1,140 +1,239 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
+  ArrowRight,
+  ArrowUpRight,
   Bell,
   Boxes,
   CheckCircle2,
   ClipboardList,
   FileClock,
   Monitor,
+  Package,
   PackageCheck,
+  PackagePlus,
   RadioTower,
+  RotateCw,
   ShieldCheck,
   Wifi,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 
 import { getAuditLog, type AuditLogEntry } from "../api/audit";
 import { getDashboardSummary, type DashboardSummary } from "../api/dashboard";
+import { getAdminNotifications, type AdminNotification } from "../api/notifications";
+import { getAdminOrders, type AdminOrder } from "../api/orders";
 import { useAuth } from "../auth/AuthProvider";
 import { formatDate, formatLabel } from "../lib/format";
 
-interface MetricCard {
-  title: string;
-  value: number;
-  copy: string;
-  tone: "neutral" | "success" | "warning" | "danger";
-  icon: typeof ClipboardList;
-}
+const statusColors: Record<string, string> = {
+  pending: "#f59e0b",
+  awaiting_locker: "#f97316",
+  assigned: "#3978f6",
+  ready_for_pickup: "#14b8a6",
+  collected: "#10a66a",
+  expired: "#ef4444",
+  cancelled: "#94a3b8",
+  returned: "#8b5cf6",
+  online: "#10a66a",
+  offline: "#ef4444",
+  maintenance: "#f59e0b",
+  available: "#10a66a",
+  reserved: "#3978f6",
+  occupied: "#8b5cf6",
+  out_of_service: "#ef4444",
+  return_pending: "#f59e0b",
+  stale: "#f59e0b",
+  never_connected: "#ef4444",
+  inactive: "#94a3b8",
+};
 
 function getCount(source: Record<string, number>, key: string): number {
   return source[key] ?? 0;
 }
 
-function buildMetricCards(summary: DashboardSummary): MetricCard[] {
-  const activeOrders =
-    getCount(summary.orders_by_status, "awaiting_locker") +
-    getCount(summary.orders_by_status, "assigned") +
-    getCount(summary.orders_by_status, "ready_for_pickup");
-
-  return [
-    {
-      title: "Total orders",
-      value: summary.totals.orders,
-      copy: "All customer orders tracked by the platform.",
-      tone: "neutral",
-      icon: ClipboardList,
-    },
-    {
-      title: "Active orders",
-      value: activeOrders,
-      copy: "Orders still moving through the locker workflow.",
-      tone: activeOrders > 0 ? "warning" : "success",
-      icon: PackageCheck,
-    },
-    {
-      title: "Available drawers",
-      value: getCount(summary.drawers_by_status, "available"),
-      copy: "Drawers currently ready for assignment.",
-      tone: "success",
-      icon: Boxes,
-    },
-    {
-      title: "Unhealthy devices",
-      value: summary.action_required.unhealthy_devices,
-      copy: "Devices that need operational review.",
-      tone:
-        summary.action_required.unhealthy_devices > 0 ? "warning" : "success",
-      icon: Monitor,
-    },
-  ];
+function useGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
 }
 
-function getSystemHealth(summary: DashboardSummary): {
-  label: string;
-  copy: string;
-  tone: "success" | "warning" | "danger";
-} {
-  const actionRequired =
-    summary.action_required.awaiting_locker_orders +
+function getSystemHealth(summary: DashboardSummary) {
+  const critical =
     summary.action_required.expired_orders +
-    summary.action_required.failed_notifications +
+    summary.action_required.failed_notifications;
+  const attention =
+    critical +
+    summary.action_required.awaiting_locker_orders +
     summary.action_required.pending_notifications +
     summary.action_required.unhealthy_devices;
 
-  if (summary.action_required.expired_orders > 0) {
-    return {
-      label: "Needs urgent review",
-      copy: `${summary.action_required.expired_orders} expired order needs attention.`,
-      tone: "danger",
-    };
-  }
-
-  if (actionRequired > 0) {
+  if (critical > 0) {
     return {
       label: "Needs attention",
-      copy: `${actionRequired} operational item${actionRequired === 1 ? "" : "s"} waiting.`,
-      tone: "warning",
-    };
+      copy: `${critical} critical operational item${critical === 1 ? "" : "s"} to review.`,
+      tone: "danger",
+    } as const;
   }
-
+  if (attention > 0) {
+    return {
+      label: "System online",
+      copy: `${attention} operational item${attention === 1 ? "" : "s"} waiting.`,
+      tone: "warning",
+    } as const;
+  }
   return {
-    label: "Healthy",
-    copy: "No urgent operational actions right now.",
+    label: "System online",
+    copy: "All monitored services are running smoothly.",
     tone: "success",
-  };
+  } as const;
 }
 
-function WorkflowStep({
-  label,
+function MetricCard({
+  title,
   value,
+  hint,
+  icon: Icon,
+  tone,
 }: {
-  label: string;
+  title: string;
   value: number;
+  hint: string;
+  icon: typeof ClipboardList;
+  tone: string;
 }) {
   return (
-    <div className={`workflow-step ${value > 0 ? "workflow-step-active" : ""}`}>
-      <strong>{value}</strong>
-      <span>{label}</span>
-    </div>
+    <article className={`dashboard-stat dashboard-stat-${tone}`}>
+      <div className="dashboard-stat-icon"><Icon size={18} /></div>
+      <div className="dashboard-stat-content">
+        <span>{title}</span>
+        <strong>{value}</strong>
+        <small>{hint}</small>
+      </div>
+    </article>
   );
 }
 
-function StatusList({
+function StatusDonut({
   title,
   data,
+  centerLabel,
 }: {
   title: string;
   data: Record<string, number>;
+  centerLabel: string;
 }) {
+  const chartData = Object.entries(data).map(([key, value]) => ({
+    name: formatLabel(key),
+    key,
+    value,
+  }));
+  const populated = chartData.filter((item) => item.value > 0);
+  const total = chartData.reduce((sum, item) => sum + item.value, 0);
+  let stop = 0;
+  const gradient = populated.map((item) => {
+    const end = stop + (item.value / Math.max(1, total)) * 100;
+    const segment = `${statusColors[item.key] ?? "#64748b"} ${stop}% ${end}%`;
+    stop = end;
+    return segment;
+  }).join(", ");
+
   return (
-    <article className="status-panel">
-      <h3 className="status-panel-title">{title}</h3>
-      <div className="status-list">
-        {Object.entries(data).map(([key, value]) => (
-          <div className="status-row" key={key}>
-            <span>{formatLabel(key)}</span>
-            <strong>{value}</strong>
+    <article className="dashboard-panel dashboard-donut-panel">
+      <div className="dashboard-panel-title-row">
+        <h2>{title}</h2>
+      </div>
+      <div className="dashboard-donut-content">
+        <div className="dashboard-donut-chart">
+          {total > 0 ? (
+            <>
+              <div className="dashboard-donut-graphic" style={{ backgroundImage: `conic-gradient(${gradient})` }} />
+              <div className="dashboard-donut-center" aria-hidden="true">
+                <strong>{total}</strong>
+                <span>{centerLabel}</span>
+              </div>
+            </>
+          ) : (
+            <div className="dashboard-donut-empty"><span>0</span></div>
+          )}
+        </div>
+        <div className="dashboard-legend">
+          {chartData.map((item) => (
+            <div className="dashboard-legend-row" key={item.key}>
+              <span className="dashboard-legend-label">
+                <i style={{ backgroundColor: statusColors[item.key] ?? "#64748b" }} />
+                {item.name}
+              </span>
+              <strong>{item.value}</strong>
+            </div>
+          ))}
+          {total === 0 && <p className="dashboard-chart-empty">No records yet</p>}
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function OrderOverview({ summary }: { summary: DashboardSummary }) {
+  const rows = [
+    { key: "collected", label: "Collected" },
+    { key: "ready_for_pickup", label: "Ready for pickup" },
+    { key: "assigned", label: "Assigned" },
+    { key: "awaiting_locker", label: "Awaiting locker" },
+    { key: "pending", label: "Pending" },
+    { key: "expired", label: "Expired" },
+  ].map((item) => ({ ...item, value: getCount(summary.orders_by_status, item.key) }));
+  const max = Math.max(1, ...rows.map((row) => row.value));
+
+  return (
+    <article className="dashboard-panel dashboard-overview-panel">
+      <div className="dashboard-panel-title-row">
+        <div>
+          <h2>Orders overview</h2>
+          <p>Current order distribution across the delivery workflow.</p>
+        </div>
+        <Link to="/orders" className="dashboard-view-link">View all <ArrowRight size={14} /></Link>
+      </div>
+      <div className="dashboard-overview-bars">
+        {rows.map((row) => (
+          <div className="dashboard-overview-row" key={row.key}>
+            <span>{row.label}</span>
+            <div className="dashboard-overview-track">
+              <i
+                style={{
+                  width: `${row.value === 0 ? 0 : Math.max(5, (row.value / max) * 100)}%`,
+                  backgroundColor: statusColors[row.key],
+                }}
+              />
+            </div>
+            <strong>{row.value}</strong>
           </div>
+        ))}
+      </div>
+      <p className="dashboard-chart-footnote">Live totals from the backend; historical daily trends are not available yet.</p>
+    </article>
+  );
+}
+
+function QuickActions() {
+  const actions = [
+    { label: "Add product", to: "/products", icon: PackagePlus, primary: true },
+    { label: "Add locker station", to: "/lockers", icon: Boxes },
+    { label: "Review devices", to: "/devices", icon: Monitor },
+    { label: "View all orders", to: "/orders", icon: Package },
+  ];
+
+  return (
+    <article className="dashboard-panel dashboard-quick-panel">
+      <div className="dashboard-panel-title-row"><h2>Quick actions</h2></div>
+      <div className="dashboard-quick-list">
+        {actions.map(({ label, to, icon: Icon, primary }) => (
+          <Link key={to} to={to} className={`dashboard-quick-link${primary ? " is-primary" : ""}`}>
+            <Icon size={15} />
+            <span>{label}</span>
+            <ArrowUpRight size={14} />
+          </Link>
         ))}
       </div>
     </article>
@@ -143,42 +242,82 @@ function StatusList({
 
 function ActivityItem({ entry }: { entry: AuditLogEntry }) {
   return (
-    <div className="activity-item">
-      <div className="activity-icon">
-        <FileClock size={15} />
-      </div>
-      <div>
+    <div className="dashboard-feed-item">
+      <div className="dashboard-feed-icon"><FileClock size={15} /></div>
+      <div className="dashboard-feed-copy">
         <strong>{formatLabel(entry.action)}</strong>
-        <p>
-          {entry.actor_username ?? "System"} on {entry.target_type}{" "}
-          <span className="mono-cell">{entry.target_id.slice(0, 8)}</span>
-        </p>
-        <span>{formatDate(entry.created_at)}</span>
+        <span>{entry.actor_username ?? "System"} · {entry.target_type} {entry.target_id.slice(0, 8)}</span>
+        <small>{formatDate(entry.created_at)}</small>
       </div>
     </div>
   );
 }
 
-
-function ActionRequiredRow({
-  label,
-  value,
-}: {
-  label: string;
-  value: number;
-}) {
+function LatestOrders({ orders }: { orders: AdminOrder[] }) {
   return (
-    <div className={value > 0 ? "action-row action-row-warning" : "action-row"}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
+    <article className="dashboard-panel dashboard-latest-orders">
+      <div className="dashboard-panel-title-row">
+        <div><h2>Latest orders</h2><p>Most recently created orders from the network.</p></div>
+        <Link to="/orders" className="dashboard-view-link">View all <ArrowRight size={14} /></Link>
+      </div>
+      {orders.length === 0 ? (
+        <div className="dashboard-empty"><Package size={17} /><span>No orders yet. New customer orders will appear here.</span></div>
+      ) : (
+        <div className="dashboard-table-wrap">
+          <table className="dashboard-table">
+            <thead><tr><th>Order ID</th><th>Customer</th><th>Total</th><th>Status</th><th>Created</th><th /></tr></thead>
+            <tbody>
+              {orders.slice(0, 5).map((order) => (
+                <tr key={order.public_id}>
+                  <td><Link to={`/orders/${order.public_id}`} className="dashboard-order-id">#{order.public_id.slice(0, 12)}</Link></td>
+                  <td>{order.customer_username}</td>
+                  <td>{order.total_amount}</td>
+                  <td><span className={`dashboard-status-pill status-${order.status}`}>{formatLabel(order.status)}</span></td>
+                  <td>{formatDate(order.created_at)}</td>
+                  <td><Link to={`/orders/${order.public_id}`} className="dashboard-row-action">View</Link></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </article>
+  );
+}
+
+function RecentNotifications({ notifications }: { notifications: AdminNotification[] }) {
+  return (
+    <article className="dashboard-panel dashboard-feed-panel">
+      <div className="dashboard-panel-title-row">
+        <div><h2>Recent notifications</h2><p>Latest messages created by the system.</p></div>
+        <Link to="/notifications" className="dashboard-view-link">View all <ArrowRight size={14} /></Link>
+      </div>
+      {notifications.length === 0 ? (
+        <div className="dashboard-empty"><Bell size={17} /><span>No notifications have been generated.</span></div>
+      ) : (
+        <div className="dashboard-feed-list">
+          {notifications.slice(0, 5).map((notification) => (
+            <div className="dashboard-feed-item" key={notification.id}>
+              <div className={`dashboard-feed-icon notification-${notification.delivery_status}`}><Bell size={15} /></div>
+              <div className="dashboard-feed-copy">
+                <strong>{notification.title}</strong>
+                <span>{notification.recipient_username} · {formatLabel(notification.delivery_status)}</span>
+                <small>{formatDate(notification.created_at)}</small>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </article>
   );
 }
 
 export function DashboardPage() {
-  const { tokens } = useAuth();
+  const { tokens, user } = useAuth();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [activity, setActivity] = useState<AuditLogEntry[]>([]);
+  const [orders, setOrders] = useState<AdminOrder[]>([]);
+  const [notifications, setNotifications] = useState<AdminNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -188,24 +327,21 @@ export function DashboardPage() {
       setLoading(false);
       return;
     }
-
     setLoading(true);
     setError(null);
-
     try {
-      const [summaryData, auditData] = await Promise.all([
+      const [summaryData, auditData, ordersData, notificationsData] = await Promise.all([
         getDashboardSummary(tokens.access),
         getAuditLog(tokens.access),
+        getAdminOrders(tokens.access),
+        getAdminNotifications(tokens.access),
       ]);
-
       setSummary(summaryData);
       setActivity(auditData.results.slice(0, 5));
+      setOrders(ordersData.results.slice(0, 5));
+      setNotifications(notificationsData.results.slice(0, 5));
     } catch (caughtError) {
-      setError(
-        caughtError instanceof Error
-          ? caughtError.message
-          : "Could not load dashboard.",
-      );
+      setError(caughtError instanceof Error ? caughtError.message : "Could not load dashboard.");
     } finally {
       setLoading(false);
     }
@@ -215,215 +351,86 @@ export function DashboardPage() {
     void loadDashboard();
   }, [tokens?.access]);
 
-  const metricCards = useMemo(
-    () => (summary ? buildMetricCards(summary) : []),
-    [summary],
-  );
-
-  const health = useMemo(
-    () => (summary ? getSystemHealth(summary) : null),
-    [summary],
-  );
+  const health = useMemo(() => summary ? getSystemHealth(summary) : null, [summary]);
+  const activeOrders = summary
+    ? getCount(summary.orders_by_status, "pending") +
+      getCount(summary.orders_by_status, "awaiting_locker") +
+      getCount(summary.orders_by_status, "assigned") +
+      getCount(summary.orders_by_status, "ready_for_pickup")
+    : 0;
+  const displayName = user?.first_name || user?.username || "Admin";
+  const greeting = useGreeting();
+  const dateLabel = new Date().toLocaleDateString(undefined, {
+    month: "short", day: "numeric", year: "numeric",
+  });
 
   return (
-    <>
-      <div className="dashboard-intro dashboard-hero">
+    <div className="dashboard-page">
+      <header className="dashboard-welcome">
         <div>
           <p className="eyebrow">Network control / Command center</p>
-          <h1 className="page-title">Operations Dashboard</h1>
-          <p className="page-description">
-            Live SmartDrop control center for orders, lockers, devices, and
-            operational actions.
-          </p>
+          <h1>{greeting}, {displayName}!</h1>
+          <p>Here&apos;s what&apos;s happening across your delivery network.</p>
         </div>
-
-        {health && (
-          <div className={`health-card health-card-${health.tone}`}>
-            <ShieldCheck size={18} />
-            <div>
-              <strong>{health.label}</strong>
-              <span>{health.copy}</span>
-            </div>
+        <div className="dashboard-welcome-right">
+          <div className="dashboard-date"><span>{dateLabel}</span><small>Live overview</small></div>
+          <div className={`dashboard-system-status dashboard-system-${health?.tone ?? "success"}`}>
+            <i />
+            <div><strong>{health?.label ?? "Connecting"}</strong><span>{health?.copy ?? "Loading system checks..."}</span></div>
+            <RadioTower size={19} />
           </div>
-        )}
-      </div>
-
-      {loading && (
-        <div className="scope-note">
-          <RadioTower size={15} />
-          <span>Loading live operational data...</span>
+          <button className="dashboard-refresh" type="button" onClick={() => void loadDashboard()} disabled={loading} aria-label="Refresh dashboard">
+            <RotateCw size={15} className={loading ? "spin" : undefined} />
+          </button>
         </div>
-      )}
+      </header>
 
-      {error && (
-        <div className="scope-note error-note">
-          <AlertTriangle size={15} />
-          <span>{error}</span>
-        </div>
-      )}
+      {loading && <div className="dashboard-loading"><RadioTower size={15} /> Loading live operational data...</div>}
+      {error && <div className="scope-note error-note"><AlertTriangle size={15} /><span>{error}</span><button type="button" onClick={() => void loadDashboard()}>Try again</button></div>}
 
       {!loading && !error && summary && (
-        <div className="dashboard-control-grid">
-          <section className="ops-pulse-panel">
-            <div className="ops-pulse-item">
-              <Wifi size={17} />
-              <div>
-                <span>Stations online</span>
-                <strong>
-                  {getCount(summary.locker_stations_by_status, "online")}
-                </strong>
-              </div>
-            </div>
-
-            <div className="ops-pulse-item">
-              <Monitor size={17} />
-              <div>
-                <span>Unhealthy devices</span>
-                <strong>{summary.action_required.unhealthy_devices}</strong>
-              </div>
-            </div>
-
-            <div className="ops-pulse-item">
-              <Bell size={17} />
-              <div>
-                <span>Pending notifications</span>
-                <strong>{summary.action_required.pending_notifications}</strong>
-              </div>
-            </div>
-
-            <div className="ops-pulse-item">
-              <AlertTriangle size={17} />
-              <div>
-                <span>Expired orders</span>
-                <strong>{summary.action_required.expired_orders}</strong>
-              </div>
-            </div>
+        <>
+          <section className="dashboard-stats-grid" aria-label="Key operational metrics">
+            <MetricCard title="Total orders" value={summary.totals.orders} hint="All customer orders" icon={Package} tone="blue" />
+            <MetricCard title="Collected" value={getCount(summary.orders_by_status, "collected")} hint="Completed pickups" icon={PackageCheck} tone="green" />
+            <MetricCard title="In progress" value={activeOrders} hint="Moving through fulfillment" icon={Boxes} tone="amber" />
+            <MetricCard title="Pending" value={getCount(summary.orders_by_status, "pending")} hint="Awaiting processing" icon={ClipboardList} tone="red" />
+            <MetricCard title="Failed notifications" value={summary.action_required.failed_notifications} hint="Delivery needs review" icon={Bell} tone="violet" />
           </section>
 
-          <section className="module-grid dashboard-metrics">
-            {metricCards.map(({ title, value, copy, icon: Icon, tone }) => (
-              <article
-                className={`metric-card metric-card-${tone}`}
-                key={title}
-              >
-                <div className="module-card-top">
-                  <div className="module-icon">
-                    <Icon size={17} strokeWidth={1.8} />
-                  </div>
-                  <span className="metric-value">{value}</span>
-                </div>
-                <h3 className="module-title">{title}</h3>
-                <p className="module-copy">{copy}</p>
-              </article>
-            ))}
+          <section className="dashboard-overview-grid">
+            <OrderOverview summary={summary} />
+            <StatusDonut title="Order status" data={summary.orders_by_status} centerLabel="Orders" />
+            <QuickActions />
           </section>
 
-         <section className="dashboard-bottom-grid">
-            <div className="dashboard-stack">
-              <article className="orders-summary-panel">
-                <h2 className="section-heading">Order workflow</h2>
-                <p className="section-subtitle">
-                  Current order movement through the locker lifecycle.
-                </p>
-
-                <div className="workflow-strip">
-                  <WorkflowStep
-                    label="Pending"
-                    value={getCount(summary.orders_by_status, "pending")}
-                  />
-                  <WorkflowStep
-                    label="Awaiting locker"
-                    value={getCount(summary.orders_by_status, "awaiting_locker")}
-                  />
-                  <WorkflowStep
-                    label="Assigned"
-                    value={getCount(summary.orders_by_status, "assigned")}
-                  />
-                  <WorkflowStep
-                    label="Ready"
-                    value={getCount(summary.orders_by_status, "ready_for_pickup")}
-                  />
-                  <WorkflowStep
-                    label="Collected"
-                    value={getCount(summary.orders_by_status, "collected")}
-                  />
-                </div>
-              </article>
-
-              <article className="orders-summary-panel">
-                <h2 className="section-heading">Locker network health</h2>
-                <p className="section-subtitle">
-                  Stations, drawers, and devices grouped by backend status.
-                </p>
-
-                <div className="status-grid dashboard-status-grid">
-                  <StatusList
-                    title="Stations"
-                    data={summary.locker_stations_by_status}
-                  />
-                  <StatusList title="Drawers" data={summary.drawers_by_status} />
-                  <StatusList
-                    title="Devices"
-                    data={summary.devices_by_connection_status}
-                  />
-                </div>
-              </article>
+          <section className="dashboard-lower-grid">
+            <div className="dashboard-main-column">
+              <div className="dashboard-network-grid">
+                <StatusDonut title="Locker stations" data={summary.locker_stations_by_status} centerLabel="Stations" />
+                <StatusDonut title="Drawer status" data={summary.drawers_by_status} centerLabel="Drawers" />
+                <StatusDonut title="Device status" data={summary.devices_by_connection_status} centerLabel="Devices" />
+              </div>
+              <LatestOrders orders={orders} />
             </div>
-
-            <div className="dashboard-stack">
-              <article className="orders-summary-panel">
-                <h2 className="section-heading">Action required</h2>
-                <p className="section-subtitle">
-                  Operational items that may need an admin decision.
-                </p>
-
-                <div className="action-list">
-                  <ActionRequiredRow
-                    label="Awaiting locker assignment"
-                    value={summary.action_required.awaiting_locker_orders}
-                  />
-                  <ActionRequiredRow
-                    label="Expired orders"
-                    value={summary.action_required.expired_orders}
-                  />
-                  <ActionRequiredRow
-                    label="Failed notifications"
-                    value={summary.action_required.failed_notifications}
-                  />
-                  <ActionRequiredRow
-                    label="Pending notifications"
-                    value={summary.action_required.pending_notifications}
-                  />
-                  <ActionRequiredRow
-                    label="Unhealthy devices"
-                    value={summary.action_required.unhealthy_devices}
-                  />
+            <div className="dashboard-side-column">
+              <article className="dashboard-panel dashboard-feed-panel">
+                <div className="dashboard-panel-title-row">
+                  <div><h2>Recent activity</h2><p>Latest admin actions from the audit trail.</p></div>
+                  <Link to="/audit-log" className="dashboard-view-link">View all <ArrowRight size={14} /></Link>
                 </div>
-              </article>
-
-              <article className="orders-summary-panel">
-                <h2 className="section-heading">Recent activity</h2>
-                <p className="section-subtitle">
-                  Latest admin actions from the audit trail.
-                </p>
-
                 {activity.length === 0 ? (
-                  <div className="empty-panel compact-empty">
-                    <CheckCircle2 size={18} />
-                    <span>No recent activity found.</span>
-                  </div>
+                  <div className="dashboard-empty"><CheckCircle2 size={17} /><span>No admin activity recorded yet.</span></div>
                 ) : (
-                  <div className="activity-list">
-                    {activity.map((entry) => (
-                      <ActivityItem entry={entry} key={entry.id} />
-                    ))}
-                  </div>
+                  <div className="dashboard-feed-list">{activity.map((entry) => <ActivityItem entry={entry} key={entry.id} />)}</div>
                 )}
               </article>
+              <RecentNotifications notifications={notifications} />
             </div>
           </section>
-        </div>
+          <p className="dashboard-updated dashboard-footer-updated">Summary generated {formatDate(summary.generated_at)}. <button type="button" onClick={() => void loadDashboard()}>Refresh data</button></p>
+        </>
       )}
-    </>
+    </div>
   );
 }

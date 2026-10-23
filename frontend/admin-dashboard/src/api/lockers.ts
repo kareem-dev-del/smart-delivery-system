@@ -1,4 +1,4 @@
-import { apiGet, apiPatch } from "./client";
+import { apiGet, apiPatch, apiPost } from "./client";
 
 export interface LockerStation {
   id: number;
@@ -20,6 +20,24 @@ export interface Drawer {
 
 export interface LockerStationDetail extends LockerStation {
   drawers: Drawer[];
+}
+
+export interface LockerStationInput {
+  name: string;
+  code: string;
+  address: string;
+  latitude: string;
+  longitude: string;
+  status: "online" | "offline" | "maintenance";
+}
+
+export interface LockerDeviceCredentials {
+  device_id: number;
+  locker_station_id: number;
+  locker_code: string;
+  device_code: string;
+  username: string;
+  initial_password: string;
 }
 
 export interface LockerDevice {
@@ -49,6 +67,54 @@ export function getLockerStationDetail(
   return apiGet<LockerStationDetail>(
     `/api/lockers/${stationId}/`,
     accessToken,
+  );
+}
+
+export function createLockerStation(
+  accessToken: string,
+  station: LockerStationInput,
+): Promise<LockerStationInput & { id: number }> {
+  return apiPost<LockerStationInput & { id: number }>(
+    "/api/lockers/admin/stations/",
+    accessToken,
+    station,
+  );
+}
+
+export function updateLockerStation(
+  accessToken: string,
+  stationId: number,
+  station: LockerStationInput,
+): Promise<LockerStationInput & { id: number }> {
+  return apiPatch<LockerStationInput & { id: number }>(
+    `/api/lockers/admin/stations/${stationId}/`,
+    accessToken,
+    station,
+  );
+}
+
+export function createLockerDrawer(
+  accessToken: string,
+  stationId: number,
+  number: number,
+  size: Drawer["size"],
+): Promise<Drawer> {
+  return apiPost<Drawer>(
+    `/api/lockers/admin/stations/${stationId}/drawers/`,
+    accessToken,
+    { number, size },
+  );
+}
+
+export function provisionLockerDevice(
+  accessToken: string,
+  stationId: number,
+  deviceCode: string,
+): Promise<LockerDeviceCredentials> {
+  return apiPost<LockerDeviceCredentials>(
+    `/api/lockers/admin/stations/${stationId}/device/`,
+    accessToken,
+    { device_code: deviceCode },
   );
 }
 

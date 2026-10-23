@@ -12,6 +12,10 @@ import { OrderDetailsPage } from './pages/OrderDetailsPage';
 import { LockersPage } from './pages/LockersPage';
 import { NotificationsPage } from './pages/NotificationsPage';
 import { AuditLogPage } from './pages/AuditLogPage';
+import { ProductsPage } from './pages/ProductsPage';
+import { PeoplePage } from './pages/PeoplePage';
+import { CategoriesPage } from './pages/CategoriesPage';
+import { ProfilePage } from './pages/ProfilePage';
 
 function IndexRedirect() {
   const { user, isAdmin, ready } = useAuth();
@@ -32,6 +36,10 @@ function App() {
               <Route element={<AppLayout />}>
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/orders" element={<OrdersPage />} />
+                <Route path="/products" element={<ProductsPage />} />
+                <Route path="/categories" element={<CategoriesPage />} />
+                <Route path="/people" element={<PeoplePage />} />
+                <Route path="/profile" element={<ProfilePage />} />
                 <Route path="/orders/:publicId" element={<OrderDetailsPage />} />
                 <Route path="/lockers" element={<LockersPage />} />
                 <Route path="/devices" element={<DevicesPage />} />

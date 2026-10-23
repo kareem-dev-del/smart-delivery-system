@@ -247,6 +247,9 @@ Main fields:
 {
   "id": 1,
   "name": "Demo Phone Case",
+  "category": 1,
+  "category_name": "Accessories",
+  "image": "http://127.0.0.1:8000/media/products/phone-case.png",
   "description": "...",
   "price": "250.00",
   "stock": 10,
@@ -261,6 +264,30 @@ Notes:
 
 - Customers should display active products.
 - Admin/support screens can use product state to manage availability.
+- Products without a category return `category: null` and `category_name: null` until assigned.
+- Product writes accept `multipart/form-data` with an optional `image` file (JPEG, PNG, or WebP, up to 5 MB). The API returns the absolute image URL or `null`.
+
+### 7.1.1 Product Categories
+
+List active categories for customer-facing product browsing:
+
+```http
+GET /api/products/categories/
+```
+
+Admin category management:
+
+```http
+GET  /api/products/admin/categories/
+POST /api/products/admin/categories/
+PATCH /api/products/admin/categories/{id}/
+Authorization: Bearer <admin_access_token>
+```
+
+Category fields are `id`, `name`, `description`, and `is_active`. Deactivate a
+category instead of deleting it so existing product relationships remain intact.
+Admins assign a category to a product with `category_id` when creating or
+updating it; send `null` to remove the assignment.
 
 ### 7.2 Product Detail
 
@@ -581,6 +608,54 @@ Authorization: Bearer <admin_access_token>
 
 Each item includes the courier `id`, `username`, profile details, and `role`.
 
+### 9.4 Admin People Management
+
+List active and inactive customer, courier, and admin accounts:
+
+```http
+GET /api/accounts/admin/users/
+Authorization: Bearer <admin_access_token>
+```
+
+Create a customer, courier, or admin account. This endpoint is admin-only. Admin accounts receive full dashboard access; locker-device accounts cannot be created through it.
+
+```http
+POST /api/accounts/admin/users/
+Authorization: Bearer <admin_access_token>
+```
+
+```json
+{
+  "username": "new-courier",
+  "password": "A-strong-password",
+  "password_confirm": "A-strong-password",
+  "first_name": "New",
+  "last_name": "Courier",
+  "email": "new-courier@example.com",
+  "phone": "+201012345678",
+  "role": "courier"
+}
+```
+
+Use `"role": "admin"` only for trusted operators who need full dashboard access.
+
+Disable or reactivate an account without deleting its order history:
+
+```http
+PATCH /api/accounts/admin/users/{user_id}/status/
+Authorization: Bearer <admin_access_token>
+```
+
+```json
+{
+  "is_active": false
+}
+```
+
+An admin cannot deactivate their own account, and the last active admin cannot be deactivated.
+
+Account creation and status changes are written to the audit log. Disabled accounts are excluded from the active courier assignment list.
+
 ```http
 POST /api/orders/{public_id}/assign-courier/
 Authorization: Bearer <admin_access_token>
@@ -594,7 +669,7 @@ Request body:
 }
 ```
 
-### 9.4 Assign Drawer
+### 9.5 Assign Drawer
 
 ```http
 POST /api/orders/{public_id}/assign/
@@ -610,7 +685,7 @@ Request body:
 }
 ```
 
-### 9.5 Locker Stations
+### 9.6 Locker Stations
 
 List locker stations:
 
@@ -638,7 +713,7 @@ PATCH /api/lockers/admin/stations/{id}/
 Authorization: Bearer <admin_access_token>
 ```
 
-### 9.6 Drawers Management
+### 9.7 Drawers Management
 
 Create drawer:
 
@@ -659,7 +734,7 @@ Allowed statuses:
 - `available`
 - `out_of_service`
 
-### 9.7 Locker Devices
+### 9.8 Locker Devices
 
 List devices:
 
@@ -685,7 +760,7 @@ Authorization: Bearer <admin_access_token>
 
 
 
-### 9.8 Admin Notifications Monitoring
+### 9.9 Admin Notifications Monitoring
 
 Screen: Admin notification delivery monitoring.
 
@@ -712,7 +787,7 @@ Admin-only response fields in addition to the standard notification fields:
 - `delivery_attempts`
 - `delivered_at`
 - `delivery_error`
-### 9.9 Audit Log
+### 9.10 Audit Log
 
 Screen: Admin audit log.
 
@@ -729,6 +804,24 @@ GET /api/audit/?target_type=order
 GET /api/audit/?actor_id=1
 GET /api/audit/?target_id=<uuid>
 ```
+
+### 9.11 Admin Product Catalogue
+
+List all products, including inactive products:
+
+```http
+GET /api/products/admin/
+Authorization: Bearer <admin_access_token>
+```
+
+Create products with `POST /api/products/` and edit them with
+`PATCH /api/products/{id}/`. Requests may use `multipart/form-data` when
+uploading an `image` (JPEG, PNG, or WebP; up to 5 MB). Omit the image field to
+keep the current image, or send `clear_image=true` to remove it. Admins can
+update the name, category, description, price, stock, parcel size
+(`small`, `medium`, `large`), availability, and image. The public product list
+continues to return active products only.
+
 ## 10. Locker Device APIs
 
 The locker machine can be real hardware, tablet UI, or simulation screen.

@@ -1,0 +1,60 @@
+.profile-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(18rem, 0.8fr);
+  align-items: start;
+  gap: 0.8rem;
+}
+.profile-panel {
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid #dce5f0;
+  border-radius: 0.65rem;
+  background: #fff;
+  box-shadow: 0 6px 20px rgba(15, 35, 62, 0.035);
+}
+.profile-panel-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 0.9rem;
+}
+.profile-panel-heading h2 { margin: 0; color: #183453; font-size: 0.9rem; }
+.profile-panel-heading p { margin: 0.2rem 0 0; color: #788aa2; font-size: 0.68rem; line-height: 1.45; }
+.profile-panel-icon {
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid #dbeafe;
+  border-radius: 0.5rem;
+  background: #eff6ff;
+  color: #2563eb;
+}
+.profile-security-icon { border-color: #d2f0e4; background: #eaf9f2; color: #159467; }
+.profile-account-identity {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem 0.8rem;
+  margin-bottom: 0.9rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #e5ebf3;
+  border-radius: 0.5rem;
+  background: #f8faff;
+}
+.profile-account-identity > span { color: #788aa2; font-size: 0.65rem; }
+.profile-account-identity > strong { color: #243c5b; font-size: 0.7rem; }
+.profile-role { display: inline-flex; align-items: center; gap: 0.3rem; color: #6941c6 !important; }
+.profile-form, .profile-password-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.7rem; }
+.profile-password-form { grid-template-columns: 1fr; }
+.profile-form .product-form-field > span, .profile-password-form .product-form-field > span { font-size: 0.68rem; }
+.profile-form .product-form-field input, .profile-password-form .product-form-field input { height: 2.4rem; border-radius: 0.45rem; font-size: 0.72rem; }
+.profile-form-actions { display: flex; grid-column: 1 / -1; justify-content: flex-end; padding-top: 0.15rem; }
+.profile-form-actions .primary-action-button { display: inline-flex; align-items: center; gap: 0.4rem; }
+@media (max-width: 850px) {
+  .profile-layout { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .profile-form { grid-template-columns: 1fr; }
+  .profile-panel { padding: 0.8rem; }
+}

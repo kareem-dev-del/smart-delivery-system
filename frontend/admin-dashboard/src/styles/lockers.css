@@ -1,0 +1,66 @@
+.drawer-size-callout {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.8rem;
+  padding: 0.42rem 0.6rem;
+  border: 1px solid #bfdbfe;
+  border-radius: 0.5rem;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 0.78rem;
+}
+.drawer-size-callout strong {
+  color: #1e3a8a;
+}
+.locker-admin-form-panel {
+  margin-bottom: 1rem;
+  padding: 1.15rem;
+  border: 1px solid var(--sd-border);
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: var(--sd-shadow);
+}
+.locker-compact-form {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+}
+.locker-row-actions {
+  display: flex;
+  min-width: 15rem;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+@media (max-width: 560px) {
+  .locker-compact-form { grid-template-columns: 1fr; }
+}
+.locker-admin-form-panel {
+  border: 1px solid #dce5f0;
+  border-radius: 0.65rem;
+  background: #fff;
+  box-shadow: 0 6px 20px rgba(15, 35, 62, 0.035);
+}
+.locker-station-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.7rem; }
+.locker-station-card { min-width: 0; padding: 0.8rem; border: 1px solid #dfe7f1; border-radius: 0.6rem; background: linear-gradient(180deg, #fff 0%, #fbfdff 100%); }
+.locker-station-card-top { display: flex; align-items: center; justify-content: space-between; gap: 0.45rem; }
+.locker-station-mark { display: grid; width: 2.2rem; height: 2.2rem; place-items: center; border: 1px solid #dce9fb; border-radius: 0.5rem; background: #edf4ff; color: #2873ef; }
+.locker-station-card h3 { margin: 0.65rem 0 0.16rem; overflow-wrap: anywhere; color: #183453; font-size: 0.83rem; }
+.locker-station-code { display: block; color: #71839d; }
+.locker-station-address { display: flex; align-items: flex-start; gap: 0.35rem; min-height: 2.1rem; margin: 0.65rem 0; color: #71839d; font-size: 0.67rem; line-height: 1.45; }
+.locker-station-address svg { flex: 0 0 auto; margin-top: 0.08rem; color: #2873ef; }
+.locker-station-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; margin-bottom: 0.6rem; }
+.locker-station-facts > div { display: grid; gap: 0.14rem; padding: 0.5rem; border: 1px solid #e7edf5; border-radius: 0.45rem; background: #f7f9fc; }
+.locker-station-facts strong { color: #153253; font-size: 1rem; }
+.locker-station-facts span { color: #788aa2; font-size: 0.6rem; }
+.locker-station-device { display: flex; align-items: center; gap: 0.4rem; min-width: 0; margin-bottom: 0.6rem; color: #72849b; font-size: 0.62rem; }
+.locker-station-device > span:nth-child(2) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.locker-station-device .status-badge { margin-left: auto; }
+.locker-station-card .locker-row-actions { min-width: 0; gap: 0.35rem; }
+.locker-station-card .locker-row-actions button { flex: 1 1 auto; }
+.locker-station-coordinates { display: block; margin-top: 0.55rem; color: #a0adbd; font-size: 0.58rem; }
+@media (max-width: 1000px) {
+  .locker-station-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 700px) {
+  .locker-station-grid { grid-template-columns: 1fr; }
+}

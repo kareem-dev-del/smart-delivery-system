@@ -54,6 +54,73 @@ class AdminCourierSerializer(AccountProfileSerializer):
     """The courier directory exposed to admin operations screens."""
 
 
+class AdminManagedAccountSerializer(AccountProfileSerializer):
+    is_active = serializers.BooleanField(read_only=True)
+
+    class Meta(AccountProfileSerializer.Meta):
+        fields = AccountProfileSerializer.Meta.fields + ("is_active",)
+
+
+class AdminManagedAccountCreateSerializer(serializers.Serializer):
+    username = serializers.CharField(min_length=3, max_length=150)
+    password = serializers.CharField(write_only=True, trim_whitespace=False)
+    password_confirm = serializers.CharField(write_only=True, trim_whitespace=False)
+    first_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    last_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    email = serializers.EmailField(required=False, allow_blank=True)
+    phone = serializers.CharField(max_length=20)
+    role = serializers.ChoiceField(
+        choices=(
+            (UserProfile.Role.CUSTOMER, "Customer"),
+            (UserProfile.Role.COURIER, "Courier"),
+            (UserProfile.Role.ADMIN, "Admin"),
+        )
+    )
+
+    def validate_username(self, value):
+        normalized_username = value.strip().lower()
+        if len(normalized_username) < 3:
+            raise serializers.ValidationError("Username must contain at least 3 characters.")
+        if User.objects.filter(username__iexact=normalized_username).exists():
+            raise serializers.ValidationError("This username is already in use.")
+        return normalized_username
+
+    def validate_phone(self, value):
+        return normalize_phone(value)
+
+    def validate(self, attrs):
+        if attrs["password"] != attrs["password_confirm"]:
+            raise serializers.ValidationError({"password_confirm": "Password confirmation does not match."})
+
+        user = User(
+            username=attrs["username"],
+            first_name=attrs.get("first_name", ""),
+            last_name=attrs.get("last_name", ""),
+            email=attrs.get("email", ""),
+        )
+        try:
+            validate_password(attrs["password"], user)
+        except DjangoValidationError as error:
+            raise serializers.ValidationError({"password": list(error.messages)}) from error
+        return attrs
+
+    @transaction.atomic
+    def create(self, validated_data):
+        validated_data.pop("password_confirm")
+        phone = validated_data.pop("phone")
+        role = validated_data.pop("role")
+        password = validated_data.pop("password")
+        user = User.objects.create_user(password=password, **validated_data)
+        user.profile.role = role
+        user.profile.phone = phone
+        user.profile.save(update_fields=("role", "phone", "updated_at"))
+        return user
+
+
+class AdminAccountStatusSerializer(serializers.Serializer):
+    is_active = serializers.BooleanField()
+
+
 class AuthenticationResponseSerializer(serializers.Serializer):
     user = AccountProfileSerializer(read_only=True)
     access = serializers.CharField(read_only=True)

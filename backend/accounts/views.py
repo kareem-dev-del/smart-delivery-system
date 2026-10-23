@@ -1,11 +1,15 @@
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema, extend_schema_view
+from audit.models import AuditLog
+from audit.services import create_audit_log
 
 from .serializers import (
     AdminCourierSerializer,
@@ -15,6 +19,9 @@ from .serializers import (
     ChangePasswordSerializer,
     LogoutSerializer,
     AuthenticationResponseSerializer,
+    AdminManagedAccountSerializer,
+    AdminManagedAccountCreateSerializer,
+    AdminAccountStatusSerializer,
 )
 from .models import UserProfile
 from .permissions import IsAdminRole
@@ -62,6 +69,126 @@ class AdminCourierListAPIView(generics.ListAPIView):
             )
             .select_related("profile")
             .order_by("username")
+        )
+
+
+@extend_schema_view(
+    get=extend_schema(
+        tags=["Account Administration"],
+        responses={status.HTTP_200_OK: AdminManagedAccountSerializer(many=True)},
+    ),
+    post=extend_schema(
+        tags=["Account Administration"],
+        request=AdminManagedAccountCreateSerializer,
+        responses={status.HTTP_201_CREATED: AdminManagedAccountSerializer},
+    ),
+)
+class AdminManagedAccountListCreateAPIView(APIView):
+    permission_classes = [IsAdminRole]
+
+    def get(self, request):
+        users = (
+            User.objects.filter(
+                profile__role__in=(
+                    UserProfile.Role.CUSTOMER,
+                    UserProfile.Role.COURIER,
+                    UserProfile.Role.ADMIN,
+                )
+            )
+            .select_related("profile")
+            .order_by("profile__role", "username")
+        )
+        return Response(
+            AdminManagedAccountSerializer(users, many=True).data,
+            status=status.HTTP_200_OK,
+            headers={"Cache-Control": "no-store"},
+        )
+
+    @transaction.atomic
+    def post(self, request):
+        serializer = AdminManagedAccountCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        create_audit_log(
+            actor=request.user,
+            action=AuditLog.Action.ACCOUNT_CREATED,
+            target_type=AuditLog.TargetType.USER,
+            target_id=user.id,
+            metadata={"username": user.username, "role": user.profile.role},
+        )
+        return Response(
+            AdminManagedAccountSerializer(user).data,
+            status=status.HTTP_201_CREATED,
+            headers={"Cache-Control": "no-store"},
+        )
+
+
+@extend_schema(
+    tags=["Account Administration"],
+    request=AdminAccountStatusSerializer,
+    responses={status.HTTP_200_OK: AdminManagedAccountSerializer},
+)
+class AdminManagedAccountStatusAPIView(APIView):
+    permission_classes = [IsAdminRole]
+
+    @transaction.atomic
+    def patch(self, request, user_id):
+        user = get_object_or_404(
+            User.objects.select_related("profile"),
+            pk=user_id,
+            profile__role__in=(
+                UserProfile.Role.CUSTOMER,
+                UserProfile.Role.COURIER,
+                UserProfile.Role.ADMIN,
+            ),
+        )
+        serializer = AdminAccountStatusSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        next_is_active = serializer.validated_data["is_active"]
+        previous_is_active = user.is_active
+
+        if (
+            user.profile.role == UserProfile.Role.ADMIN
+            and previous_is_active
+            and not next_is_active
+        ):
+            if user.pk == request.user.pk:
+                return Response(
+                    {"detail": "You cannot deactivate your own admin account."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            active_admins = list(
+                User.objects.select_for_update()
+                .filter(is_active=True, profile__role=UserProfile.Role.ADMIN)
+                .order_by("pk")
+                .values_list("pk", flat=True)
+            )
+            if len(active_admins) <= 1:
+                return Response(
+                    {"detail": "The last active admin account cannot be deactivated."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        if previous_is_active != next_is_active:
+            user.is_active = next_is_active
+            user.save(update_fields=("is_active",))
+            create_audit_log(
+                actor=request.user,
+                action=AuditLog.Action.ACCOUNT_STATUS_CHANGED,
+                target_type=AuditLog.TargetType.USER,
+                target_id=user.id,
+                metadata={
+                    "username": user.username,
+                    "role": user.profile.role,
+                    "is_active": next_is_active,
+                },
+            )
+
+        return Response(
+            AdminManagedAccountSerializer(user).data,
+            status=status.HTTP_200_OK,
+            headers={"Cache-Control": "no-store"},
         )
 
 
