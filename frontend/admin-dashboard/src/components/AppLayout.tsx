@@ -5,13 +5,17 @@ import {
   Bell,
   Boxes,
   ClipboardList,
+  FolderTree,
   FileClock,
   LayoutDashboard,
   LogOut,
   Menu,
   Monitor,
+  Package,
   Search,
   ShieldCheck,
+  UserRound,
+  UsersRound,
   X,
 } from "lucide-react";
 
@@ -21,6 +25,10 @@ import { Brand } from "./Brand";
 const navItems = [
   { label: "Dashboard", to: "/dashboard", icon: LayoutDashboard, badge: null },
   { label: "Orders", to: "/orders", icon: ClipboardList, badge: null },
+  { label: "Products", to: "/products", icon: Package, badge: null },
+  { label: "Categories", to: "/categories", icon: FolderTree, badge: null },
+  { label: "People", to: "/people", icon: UsersRound, badge: null },
+  { label: "My profile", to: "/profile", icon: UserRound, badge: null },
   { label: "Lockers", to: "/lockers", icon: Boxes, badge: null },
   { label: "Devices", to: "/devices", icon: Monitor, badge: null },
   { label: "Notifications", to: "/notifications", icon: Bell, badge: null },

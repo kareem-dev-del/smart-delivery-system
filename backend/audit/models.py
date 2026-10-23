@@ -8,6 +8,7 @@ class AuditLog(models.Model):
         LOCKER_STATION = "locker_station", "Locker Station"
         DRAWER = "drawer", "Drawer"
         LOCKER_DEVICE = "locker_device", "Locker Device"
+        USER = "user", "User"
 
     class Action(models.TextChoices):
         ORDER_DRAWER_ASSIGNED = (
@@ -44,6 +45,8 @@ class AuditLog(models.Model):
             "locker_device_activated",
             "Locker Device Activated",
         )
+        ACCOUNT_CREATED = "account_created", "Account Created"
+        ACCOUNT_STATUS_CHANGED = "account_status_changed", "Account Status Changed"
 
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL,

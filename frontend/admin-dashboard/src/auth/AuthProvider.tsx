@@ -8,6 +8,8 @@ interface AuthContextValue extends AuthState {
   ready: boolean;
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
+  updateUser: (user: User) => void;
+  replaceSession: (user: User, tokens: AuthTokens) => void;
 }
 const AuthContext = createContext<AuthContextValue | null>(null);
 
@@ -78,7 +80,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuth({ user: null, tokens: null, isAdmin: false });
   }, []);
 
-  const value = useMemo(() => ({ ...auth, ready, login, logout }), [auth, ready, login, logout]);
+  const updateUser = useCallback((user: User) => {
+    setAuth((current) => ({ ...current, user, isAdmin: isAdminUser(user) }));
+  }, []);
+
+  const replaceSession = useCallback((user: User, tokens: AuthTokens) => {
+    persist(tokens);
+    setAuth({ user, tokens, isAdmin: isAdminUser(user) });
+  }, []);
+
+  const value = useMemo(() => ({ ...auth, ready, login, logout, updateUser, replaceSession }), [auth, ready, login, logout, updateUser, replaceSession]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

@@ -44,13 +44,19 @@ export async function apiRequest<T>(
   path: string,
   options: ApiRequestOptions,
 ): Promise<T> {
+  const requestBody = options.body instanceof FormData
+    ? options.body
+    : options.body
+      ? JSON.stringify(options.body)
+      : undefined;
+  const isMultipart = requestBody instanceof FormData;
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: options.method ?? "GET",
     headers: {
       Authorization: `Bearer ${options.accessToken}`,
-      "Content-Type": "application/json",
+      ...(isMultipart ? {} : { "Content-Type": "application/json" }),
     },
-    body: options.body ? JSON.stringify(options.body) : undefined,
+    body: requestBody,
   });
 
   const parsedResponse = await parseResponse(response);

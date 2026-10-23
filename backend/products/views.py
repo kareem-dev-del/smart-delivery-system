@@ -1,15 +1,15 @@
+from django.core.cache import cache
+from django.db.models import Count
 from rest_framework import generics
 from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
 
 from accounts.models import UserProfile
 from accounts.permissions import IsAdminRole
 
-from .models import Product
-from .serializers import ProductSerializer
+from .models import Category, Product
+from .serializers import CategorySerializer, ProductSerializer
 
-
-from django.core.cache import cache
-from rest_framework.response import Response
 
 from .cache import ACTIVE_PRODUCT_LIST_CACHE_KEY
 
@@ -19,6 +19,7 @@ class ProductListCreateAPIView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         queryset = Product.objects.all()
+        queryset = queryset.select_related("category")
 
         if self.request.method == "GET":
             queryset = queryset.filter(is_active=True)
@@ -50,11 +51,42 @@ class ProductListCreateAPIView(generics.ListCreateAPIView):
         return response   
 
 
+class AdminProductListAPIView(generics.ListAPIView):
+    serializer_class = ProductSerializer
+    permission_classes = [IsAdminRole]
+
+    def get_queryset(self):
+        return Product.objects.select_related("category").all()
+
+
+class ActiveCategoryListAPIView(generics.ListAPIView):
+    serializer_class = CategorySerializer
+    permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        return Category.objects.filter(is_active=True).annotate(
+            product_count=Count("products")
+        )
+
+
+class AdminCategoryListCreateAPIView(generics.ListCreateAPIView):
+    queryset = Category.objects.annotate(product_count=Count("products"))
+    serializer_class = CategorySerializer
+    permission_classes = [IsAdminRole]
+
+
+class AdminCategoryDetailAPIView(generics.RetrieveUpdateAPIView):
+    queryset = Category.objects.annotate(product_count=Count("products"))
+    serializer_class = CategorySerializer
+    permission_classes = [IsAdminRole]
+
+
 class ProductRetrieveUpdateAPIView(generics.RetrieveUpdateAPIView):
     serializer_class = ProductSerializer
 
     def get_queryset(self):
         queryset = Product.objects.all()
+        queryset = queryset.select_related("category")
 
         if self.request.method == "GET":
             user = self.request.user

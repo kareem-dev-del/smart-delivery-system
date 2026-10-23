@@ -2,6 +2,7 @@ from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
+from audit.models import AuditLog
 
 from .models import UserProfile
 
@@ -199,3 +200,126 @@ class AdminCourierListAPIViewTests(APITestCase):
         response = self.client.get(self.url())
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class AdminManagedAccountAPIViewTests(APITestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(username="ops-admin", password="SafePass123!2026")
+        self.admin.profile.role = UserProfile.Role.ADMIN
+        self.admin.profile.save(update_fields=("role", "updated_at"))
+        self.customer = User.objects.create_user(username="managed-customer", password="SafePass123!2026")
+        self.courier = User.objects.create_user(username="managed-courier", password="SafePass123!2026")
+        self.courier.profile.role = UserProfile.Role.COURIER
+        self.courier.profile.save(update_fields=("role", "updated_at"))
+
+    def list_url(self):
+        return reverse("admin-managed-user-list-create")
+
+    def status_url(self, user):
+        return reverse("admin-managed-user-status", args=(user.id,))
+
+    def valid_payload(self, **overrides):
+        payload = {
+            "username": "new-courier",
+            "password": "DistinctPass123!2026",
+            "password_confirm": "DistinctPass123!2026",
+            "first_name": "New",
+            "last_name": "Courier",
+            "email": "new-courier@example.com",
+            "phone": "+201012345678",
+            "role": UserProfile.Role.COURIER,
+        }
+        payload.update(overrides)
+        return payload
+
+    def test_admin_can_list_customer_courier_and_admin_accounts(self):
+        self.client.force_authenticate(user=self.admin)
+
+        response = self.client.get(self.list_url())
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual({item["role"] for item in response.data}, {"customer", "courier", "admin"})
+        self.assertTrue(all("is_active" in item for item in response.data))
+
+    def test_admin_can_create_customer_courier_or_admin_accounts(self):
+        self.client.force_authenticate(user=self.admin)
+
+        response = self.client.post(self.list_url(), self.valid_payload(), format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["role"], UserProfile.Role.COURIER)
+        self.assertTrue(response.data["is_active"])
+        created = User.objects.get(username="new-courier")
+        self.assertTrue(created.check_password("DistinctPass123!2026"))
+        self.assertEqual(AuditLog.objects.filter(action=AuditLog.Action.ACCOUNT_CREATED).count(), 1)
+
+    def test_admin_can_create_an_admin_through_managed_accounts(self):
+        self.client.force_authenticate(user=self.admin)
+
+        response = self.client.post(
+            self.list_url(),
+            self.valid_payload(username="new-admin", role=UserProfile.Role.ADMIN),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["role"], UserProfile.Role.ADMIN)
+        self.assertTrue(User.objects.filter(username="new-admin", profile__role=UserProfile.Role.ADMIN).exists())
+
+    def test_admin_cannot_deactivate_own_admin_account(self):
+        self.client.force_authenticate(user=self.admin)
+
+        response = self.client.patch(
+            self.status_url(self.admin),
+            {"is_active": False},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.admin.refresh_from_db()
+        self.assertTrue(self.admin.is_active)
+
+    def test_admin_can_deactivate_another_admin(self):
+        other_admin = User.objects.create_user(
+            username="another-admin",
+            password="SafePass123!2026",
+        )
+        other_admin.profile.role = UserProfile.Role.ADMIN
+        other_admin.profile.save(update_fields=("role", "updated_at"))
+        self.client.force_authenticate(user=self.admin)
+
+        response = self.client.patch(
+            self.status_url(other_admin),
+            {"is_active": False},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data["is_active"])
+
+    def test_admin_can_deactivate_and_reactivate_accounts(self):
+        self.client.force_authenticate(user=self.admin)
+
+        deactivated = self.client.patch(
+            self.status_url(self.courier),
+            {"is_active": False},
+            format="json",
+        )
+        self.assertEqual(deactivated.status_code, status.HTTP_200_OK)
+        self.assertFalse(deactivated.data["is_active"])
+
+        reactivated = self.client.patch(
+            self.status_url(self.courier),
+            {"is_active": True},
+            format="json",
+        )
+        self.assertEqual(reactivated.status_code, status.HTTP_200_OK)
+        self.assertTrue(reactivated.data["is_active"])
+        self.assertEqual(AuditLog.objects.filter(action=AuditLog.Action.ACCOUNT_STATUS_CHANGED).count(), 2)
+
+    def test_non_admin_cannot_manage_accounts(self):
+        self.client.force_authenticate(user=self.customer)
+
+        response = self.client.get(self.list_url())
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)

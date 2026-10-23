@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { formatDate, formatLabel } from "../lib/format";
 import { Link, useParams } from "react-router-dom";
 import {
   AlertTriangle,
@@ -14,12 +13,24 @@ import {
 import { getAdminCouriers, type AdminCourier } from "../api/accounts";
 import {
   assignCourierToOrder,
+  assignOrderToDrawer,
   getAdminOrder,
   type AdminOrder,
 } from "../api/orders";
+import {
+  getLockerStationDetail,
+  getLockerStations,
+  type LockerStation,
+  type LockerStationDetail,
+} from "../api/lockers";
 import { useAuth } from "../auth/AuthProvider";
+import { formatDate, formatLabel } from "../lib/format";
 
-
+const DRAWER_SIZE_RANK: Record<string, number> = {
+  small: 1,
+  medium: 2,
+  large: 3,
+};
 
 function DetailRow({
   label,
@@ -56,20 +67,36 @@ function TimelineRow({
 
 function getCourierLabel(courier: AdminCourier): string {
   const fullName = `${courier.first_name} ${courier.last_name}`.trim();
+
   return fullName ? `${fullName} (@${courier.username})` : courier.username;
 }
 
 export function OrderDetailsPage() {
   const { publicId } = useParams();
   const { tokens } = useAuth();
+
   const [order, setOrder] = useState<AdminOrder | null>(null);
   const [couriers, setCouriers] = useState<AdminCourier[]>([]);
+  const [lockers, setLockers] = useState<LockerStation[]>([]);
+
   const [selectedCourierId, setSelectedCourierId] = useState("");
+  const [selectedLockerId, setSelectedLockerId] = useState("");
+  const [selectedDrawerId, setSelectedDrawerId] = useState("");
+  const [selectedLockerDetail, setSelectedLockerDetail] =
+    useState<LockerStationDetail | null>(null);
+
   const [loading, setLoading] = useState(true);
+  const [drawerLoading, setDrawerLoading] = useState(false);
   const [assigningCourier, setAssigningCourier] = useState(false);
+  const [assigningDrawer, setAssigningDrawer] = useState(false);
+
   const [error, setError] = useState<string | null>(null);
   const [assignmentError, setAssignmentError] = useState<string | null>(null);
   const [assignmentNotice, setAssignmentNotice] = useState<string | null>(null);
+  const [drawerAssignmentError, setDrawerAssignmentError] =
+    useState<string | null>(null);
+  const [drawerAssignmentNotice, setDrawerAssignmentNotice] =
+    useState<string | null>(null);
 
   async function loadOrder() {
     if (!tokens?.access) {
@@ -78,7 +105,7 @@ export function OrderDetailsPage() {
       return;
     }
 
-   if (!publicId) {
+    if (!publicId) {
       setError("Missing order identifier.");
       setOrder(null);
       setLoading(false);
@@ -89,14 +116,19 @@ export function OrderDetailsPage() {
     setError(null);
 
     try {
-      const [orderData, courierData] = await Promise.all([
+      const [orderData, courierData, lockerData] = await Promise.all([
         getAdminOrder(tokens.access, publicId),
         getAdminCouriers(tokens.access),
+        getLockerStations(tokens.access),
       ]);
+
       setOrder(orderData);
       setCouriers(courierData);
+      setLockers(lockerData);
       setSelectedCourierId(
-        orderData.assigned_courier ? String(orderData.assigned_courier) : "",
+        orderData.assigned_courier
+          ? String(orderData.assigned_courier)
+          : "",
       );
     } catch (caughtError) {
       setError(
@@ -113,13 +145,95 @@ export function OrderDetailsPage() {
     void loadOrder();
   }, [tokens?.access, publicId]);
 
-  const totalItems = useMemo(() => {
-    return order?.items.reduce((total, item) => total + item.quantity, 0) ?? 0;
+  useEffect(() => {
+    const accessToken = tokens?.access;
+    let cancelled = false;
+
+    if (!accessToken || !selectedLockerId) {
+      setSelectedLockerDetail(null);
+      setDrawerLoading(false);
+      return;
+    }
+
+    async function loadSelectedLocker(accessToken: string) {
+      setDrawerLoading(true);
+      setDrawerAssignmentError(null);
+
+      try {
+        const lockerDetail = await getLockerStationDetail(
+          accessToken,
+          Number(selectedLockerId),
+        );
+
+        if (!cancelled) {
+          setSelectedLockerDetail(lockerDetail);
+        }
+      } catch (caughtError) {
+        if (!cancelled) {
+          setSelectedLockerDetail(null);
+          setDrawerAssignmentError(
+            caughtError instanceof Error
+              ? caughtError.message
+              : "Could not load locker drawers.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setDrawerLoading(false);
+        }
+      }
+    }
+
+    void loadSelectedLocker(accessToken);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedLockerId, tokens?.access]);
+
+  const totalItems = useMemo(
+    () => order?.items.reduce((total, item) => total + item.quantity, 0) ?? 0,
+    [order],
+  );
+
+  const onlineLockers = useMemo(
+    () => lockers.filter((locker) => locker.status === "online"),
+    [lockers],
+  );
+
+  const requiredDrawerSize = useMemo(() => {
+    if (!order) return null;
+
+    return order.items.reduce<string | null>((largestSize, item) => {
+      if (!largestSize) return item.product_size;
+
+      return (DRAWER_SIZE_RANK[item.product_size] ?? 0) >
+        (DRAWER_SIZE_RANK[largestSize] ?? 0)
+        ? item.product_size
+        : largestSize;
+    }, null);
   }, [order]);
 
+  const compatibleDrawers = useMemo(() => {
+    if (!selectedLockerDetail) return [];
+
+    const requiredSizeRank = requiredDrawerSize
+      ? DRAWER_SIZE_RANK[requiredDrawerSize] ?? 0
+      : 0;
+
+    return selectedLockerDetail.drawers.filter(
+      (drawer) =>
+        drawer.status === "available" &&
+        (DRAWER_SIZE_RANK[drawer.size] ?? 0) >= requiredSizeRank,
+    );
+  }, [requiredDrawerSize, selectedLockerDetail]);
+
   const canAssignCourier = Boolean(
-    order && ["awaiting_locker", "assigned", "expired"].includes(order.status),
+    order &&
+      ["awaiting_locker", "assigned", "expired"].includes(order.status),
   );
+
+  const canAssignDrawer = order?.status === "awaiting_locker";
 
   async function handleCourierAssignment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -150,6 +264,7 @@ export function OrderDetailsPage() {
             }
           : currentOrder,
       );
+
       setAssignmentNotice(`${assignment.courier_username} is now assigned.`);
     } catch (caughtError) {
       setAssignmentError(
@@ -159,6 +274,54 @@ export function OrderDetailsPage() {
       );
     } finally {
       setAssigningCourier(false);
+    }
+  }
+
+  function handleLockerChange(lockerId: string) {
+    setSelectedLockerId(lockerId);
+    setSelectedDrawerId("");
+    setDrawerAssignmentError(null);
+    setDrawerAssignmentNotice(null);
+  }
+
+  async function handleDrawerAssignment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!tokens?.access || !order || !selectedLockerId || !selectedDrawerId) {
+      setDrawerAssignmentError("Select a locker and compatible drawer first.");
+      return;
+    }
+
+    setAssigningDrawer(true);
+    setDrawerAssignmentError(null);
+    setDrawerAssignmentNotice(null);
+
+    try {
+      const updatedOrder = await assignOrderToDrawer(
+        tokens.access,
+        order.public_id,
+        Number(selectedLockerId),
+        Number(selectedDrawerId),
+      );
+
+      setOrder(updatedOrder);
+      setSelectedLockerId("");
+      setSelectedDrawerId("");
+      setSelectedLockerDetail(null);
+
+      setDrawerAssignmentNotice(
+        `Assigned to drawer ${updatedOrder.assigned_drawer_number} at ${
+          updatedOrder.locker?.name ?? "the selected locker"
+        }.`,
+      );
+    } catch (caughtError) {
+      setDrawerAssignmentError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Could not assign the locker drawer.",
+      );
+    } finally {
+      setAssigningDrawer(false);
     }
   }
 
@@ -232,12 +395,17 @@ export function OrderDetailsPage() {
                   No active couriers are available for assignment.
                 </p>
               ) : (
-                <form className="order-assignment-form" onSubmit={handleCourierAssignment}>
+                <form
+                  className="order-assignment-form"
+                  onSubmit={handleCourierAssignment}
+                >
                   <label htmlFor="courier-id">Active courier</label>
                   <select
                     id="courier-id"
                     value={selectedCourierId}
-                    onChange={(event) => setSelectedCourierId(event.target.value)}
+                    onChange={(event) =>
+                      setSelectedCourierId(event.target.value)
+                    }
                     disabled={assigningCourier}
                   >
                     <option value="">Select a courier</option>
@@ -259,16 +427,150 @@ export function OrderDetailsPage() {
               )}
 
               {assignmentError && (
-                <p className="assignment-message assignment-message-error" role="alert">
+                <p
+                  className="assignment-message assignment-message-error"
+                  role="alert"
+                >
                   {assignmentError}
                 </p>
               )}
+
               {assignmentNotice && (
-                <p className="assignment-message assignment-message-success" role="status">
+                <p
+                  className="assignment-message assignment-message-success"
+                  role="status"
+                >
                   {assignmentNotice}
                 </p>
               )}
             </section>
+          )}
+
+          {canAssignDrawer && (
+            <section
+              className="order-assignment-panel drawer-assignment-panel"
+              aria-labelledby="drawer-assignment-heading"
+            >
+              <div className="order-assignment-copy">
+                <div className="detail-panel-heading">
+                  <Warehouse size={17} />
+                  <h2 id="drawer-assignment-heading">Locker assignment</h2>
+                </div>
+                <p>
+                  Reserve a compatible available drawer. The locker must be
+                  online and the drawer must fit every item in this order.
+                </p>
+                {requiredDrawerSize && (
+                  <div className="drawer-size-callout">
+                    <span>Required drawer size</span>
+                    <strong>{formatLabel(requiredDrawerSize)}</strong>
+                  </div>
+                )}
+              </div>
+
+              {onlineLockers.length === 0 ? (
+                <p className="assignment-message assignment-message-error">
+                  No online locker stations are available for assignment.
+                </p>
+              ) : (
+                <form
+                  className="drawer-assignment-form"
+                  onSubmit={handleDrawerAssignment}
+                >
+                  <div className="assignment-field">
+                    <label htmlFor="locker-station-id">Locker station</label>
+                    <select
+                      id="locker-station-id"
+                      value={selectedLockerId}
+                      onChange={(event) =>
+                        handleLockerChange(event.target.value)
+                      }
+                      disabled={assigningDrawer}
+                    >
+                      <option value="">Select an online locker</option>
+                      {onlineLockers.map((locker) => (
+                        <option key={locker.id} value={locker.id}>
+                          {locker.name} ({locker.available_drawers_count}{" "}
+                          available)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="assignment-field">
+                    <label htmlFor="drawer-id">
+                      Compatible drawer
+                      {requiredDrawerSize
+                        ? ` (${formatLabel(requiredDrawerSize)} or larger)`
+                        : ""}
+                    </label>
+                    <select
+                      id="drawer-id"
+                      value={selectedDrawerId}
+                      onChange={(event) =>
+                        setSelectedDrawerId(event.target.value)
+                      }
+                      disabled={
+                        assigningDrawer ||
+                        drawerLoading ||
+                        !selectedLockerId ||
+                        compatibleDrawers.length === 0
+                      }
+                    >
+                      <option value="">
+                        {drawerLoading
+                          ? "Loading drawers..."
+                          : "Select an available drawer"}
+                      </option>
+                      {compatibleDrawers.map((drawer) => (
+                        <option key={drawer.id} value={drawer.id}>
+                          Drawer {drawer.number} ({formatLabel(drawer.size)})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <button
+                    className="assignment-submit"
+                    type="submit"
+                    disabled={
+                      assigningDrawer ||
+                      drawerLoading ||
+                      !selectedLockerId ||
+                      !selectedDrawerId
+                    }
+                  >
+                    <Warehouse size={15} />
+                    {assigningDrawer ? "Assigning..." : "Reserve drawer"}
+                  </button>
+                </form>
+              )}
+
+              {selectedLockerId &&
+                !drawerLoading &&
+                compatibleDrawers.length === 0 && (
+                  <p className="assignment-message assignment-message-error">
+                    This locker has no available drawer large enough for the
+                    order.
+                  </p>
+                )}
+
+              {drawerAssignmentError && (
+                <p
+                  className="assignment-message assignment-message-error"
+                  role="alert"
+                >
+                  {drawerAssignmentError}
+                </p>
+              )}
+            </section>
+          )}
+
+          {drawerAssignmentNotice && (
+            <div className="scope-note assignment-success-note" role="status">
+              <Warehouse size={15} />
+              <span>{drawerAssignmentNotice}</span>
+            </div>
           )}
 
           <section className="details-grid" aria-label="Order details">
@@ -304,10 +606,13 @@ export function OrderDetailsPage() {
               </div>
               <DetailRow label="Total items" value={totalItems} />
               {order.items.map((item) => (
-                <div className="item-row" key={`${item.product}-${item.product_name}`}>
+                <div
+                  className="item-row"
+                  key={`${item.product}-${item.product_name}`}
+                >
                   <div>
                     <strong>{item.product_name}</strong>
-                    <span>{item.product_size}</span>
+                    <span>{formatLabel(item.product_size)}</span>
                   </div>
                   <div>
                     <strong>{item.quantity}x</strong>
@@ -328,7 +633,10 @@ export function OrderDetailsPage() {
                   label="Courier assigned"
                   value={order.courier_assigned_at}
                 />
-                <TimelineRow label="Drawer assigned" value={order.assigned_at} />
+                <TimelineRow
+                  label="Drawer assigned"
+                  value={order.assigned_at}
+                />
                 <TimelineRow
                   label="Ready for pickup"
                   value={order.ready_for_pickup_at}

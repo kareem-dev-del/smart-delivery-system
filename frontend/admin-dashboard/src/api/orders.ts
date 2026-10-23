@@ -60,8 +60,15 @@ export interface CourierAssignment {
 
 export function getAdminOrders(
   accessToken: string,
+  filters: { status?: string; search?: string; page?: number; pageSize?: number } = {},
 ): Promise<AdminOrdersResponse> {
-  return apiGet<AdminOrdersResponse>("/api/orders/admin/", accessToken);
+  const query = new URLSearchParams();
+  if (filters.status) query.set("status", filters.status);
+  if (filters.search?.trim()) query.set("search", filters.search.trim());
+  if (filters.page && filters.page > 1) query.set("page", String(filters.page));
+  if (filters.pageSize) query.set("page_size", String(filters.pageSize));
+  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+  return apiGet<AdminOrdersResponse>(`/api/orders/admin/${suffix}`, accessToken);
 }
 
 export function getAdminOrder(
@@ -83,5 +90,21 @@ export function assignCourierToOrder(
     `/api/orders/${publicId}/assign-courier/`,
     accessToken,
     { courier_id: courierId },
+  );
+}
+
+export function assignOrderToDrawer(
+  accessToken: string,
+  publicId: string,
+  lockerStationId: number,
+  drawerId: number,
+): Promise<AdminOrder> {
+  return apiPost<AdminOrder>(
+    `/api/orders/${publicId}/assign/`,
+    accessToken,
+    {
+      locker_station_id: lockerStationId,
+      drawer_id: drawerId,
+    },
   );
 }

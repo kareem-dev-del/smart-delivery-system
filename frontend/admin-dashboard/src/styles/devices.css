@@ -1,0 +1,29 @@
+.device-credentials-panel {
+  display: grid;
+  grid-template-columns: minmax(12rem, 0.8fr) minmax(20rem, 1.2fr) auto;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 1.1rem;
+  border: 1px solid #f6d28b;
+  border-radius: 0.9rem;
+  background: #fffbeb;
+}
+.device-credentials-panel h2 { margin: 0.15rem 0 0.35rem; color: #78350f; font-size: 1rem; }
+.device-credentials-panel p:not(.eyebrow) { margin: 0; color: #854d0e; font-size: 0.8rem; line-height: 1.45; }
+.device-credentials-panel dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.6rem; margin: 0; }
+.device-credentials-panel dl > div { min-width: 0; }
+.device-credentials-panel dt { color: #92400e; font-size: 0.72rem; font-weight: 750; }
+.device-credentials-panel dd { margin: 0.2rem 0 0; overflow-wrap: anywhere; color: #422006; font-size: 0.82rem; font-weight: 650; }
+@media (max-width: 900px) {
+  .device-credentials-panel { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .device-credentials-panel dl { grid-template-columns: 1fr; }
+}
+.device-credentials-panel {
+  border: 1px solid #dce5f0;
+  border-radius: 0.65rem;
+  background: #fff;
+  box-shadow: 0 6px 20px rgba(15, 35, 62, 0.035);
+}
