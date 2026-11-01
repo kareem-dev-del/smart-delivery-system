@@ -10,5 +10,7 @@ export function formatDate(value: string | null): string {
     return "-";
   }
 
-  return new Date(value).toLocaleString();
+  return new Date(value).toLocaleString(
+    document.documentElement.lang === "ar" ? "ar-EG" : "en-US",
+  );
 }

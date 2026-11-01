@@ -25,6 +25,8 @@ import {
 } from "../api/lockers";
 import { useAuth } from "../auth/AuthProvider";
 import { formatDate, formatLabel } from "../lib/format";
+import { useLocale } from "../i18n/LocaleProvider";
+import { StyledSelect } from "../components/StyledSelect";
 
 const DRAWER_SIZE_RANK: Record<string, number> = {
   small: 1,
@@ -72,6 +74,7 @@ function getCourierLabel(courier: AdminCourier): string {
 }
 
 export function OrderDetailsPage() {
+  const { t, locale } = useLocale();
   const { publicId } = useParams();
   const { tokens } = useAuth();
 
@@ -228,6 +231,13 @@ export function OrderDetailsPage() {
     );
   }, [requiredDrawerSize, selectedLockerDetail]);
 
+  const assignableCouriers = useMemo(
+    () => couriers.filter((courier) =>
+      courier.dispatch_status === "available" || courier.id === order?.assigned_courier,
+    ),
+    [couriers, order?.assigned_courier],
+  );
+
   const canAssignCourier = Boolean(
     order &&
       ["awaiting_locker", "assigned", "expired"].includes(order.status),
@@ -265,7 +275,7 @@ export function OrderDetailsPage() {
           : currentOrder,
       );
 
-      setAssignmentNotice(`${assignment.courier_username} is now assigned.`);
+      setAssignmentNotice(locale === "ar" ? `تم تعيين المندوب ${assignment.courier_username}.` : `${assignment.courier_username} is now assigned.`);
     } catch (caughtError) {
       setAssignmentError(
         caughtError instanceof Error
@@ -309,11 +319,9 @@ export function OrderDetailsPage() {
       setSelectedDrawerId("");
       setSelectedLockerDetail(null);
 
-      setDrawerAssignmentNotice(
-        `Assigned to drawer ${updatedOrder.assigned_drawer_number} at ${
-          updatedOrder.locker?.name ?? "the selected locker"
-        }.`,
-      );
+      setDrawerAssignmentNotice(locale === "ar"
+        ? `تم تخصيص الدرج ${updatedOrder.assigned_drawer_number} في ${updatedOrder.locker?.name ?? "محطة الاستلام المختارة"}.`
+        : `Assigned to drawer ${updatedOrder.assigned_drawer_number} at ${updatedOrder.locker?.name ?? "the selected locker"}.`);
     } catch (caughtError) {
       setDrawerAssignmentError(
         caughtError instanceof Error
@@ -331,12 +339,12 @@ export function OrderDetailsPage() {
         <div>
           <Link className="back-link" to="/orders">
             <ArrowLeft size={15} />
-            Back to orders
+            {t("Back to orders")}
           </Link>
-          <p className="eyebrow">Network control / Order details</p>
-          <h1 className="page-title">Order details</h1>
+          <p className="eyebrow">{t("Network control / Order details")}</p>
+          <h1 className="page-title">{t("Order details")}</h1>
           <p className="page-description">
-            Full operational view for a single SmartDrop order.
+            {t("Full operational view for a single SmartDrop order.")}
           </p>
         </div>
       </div>
@@ -344,7 +352,7 @@ export function OrderDetailsPage() {
       {loading && (
         <div className="scope-note">
           <ClipboardList size={15} />
-          <span>Loading order details...</span>
+          <span>{t("Loading order details...")}</span>
         </div>
       )}
 
@@ -359,17 +367,17 @@ export function OrderDetailsPage() {
         <>
           <section className="details-hero" aria-labelledby="order-heading">
             <div>
-              <p className="eyebrow">Order</p>
+              <p className="eyebrow">{t("Order")}</p>
               <h2 id="order-heading" className="details-title">
                 {order.public_id}
               </h2>
               <span className={`status-badge status-${order.status}`}>
-                {formatLabel(order.status)}
+                {t(formatLabel(order.status))}
               </span>
             </div>
 
             <div className="details-total">
-              <span>Total</span>
+              <span>{t("Total")}</span>
               <strong>{order.total_amount}</strong>
             </div>
           </section>
@@ -382,46 +390,44 @@ export function OrderDetailsPage() {
               <div className="order-assignment-copy">
                 <div className="detail-panel-heading">
                   <UserRoundPlus size={17} />
-                  <h2 id="courier-assignment-heading">Courier assignment</h2>
+                  <h2 id="courier-assignment-heading">{t("Courier assignment")}</h2>
                 </div>
                 <p>
-                  Choose an active courier to take responsibility for this
-                  order. The assignment is recorded in the audit trail.
+                  {t("Choose an on-shift courier with no other active order. Live location and distance-based matching are not available yet.")}
                 </p>
               </div>
 
-              {couriers.length === 0 ? (
+              {assignableCouriers.length === 0 ? (
                 <p className="assignment-message assignment-message-error">
-                  No active couriers are available for assignment.
+                  {t("No available on-shift couriers. Start a courier shift in People & access first.")}
                 </p>
               ) : (
                 <form
                   className="order-assignment-form"
                   onSubmit={handleCourierAssignment}
                 >
-                  <label htmlFor="courier-id">Active courier</label>
-                  <select
-                    id="courier-id"
+                  <label htmlFor="courier-id">{t("Active courier")}</label>
+                  <StyledSelect
+                    className="assignment-select-control"
                     value={selectedCourierId}
-                    onChange={(event) =>
-                      setSelectedCourierId(event.target.value)
-                    }
+                    onChange={setSelectedCourierId}
                     disabled={assigningCourier}
-                  >
-                    <option value="">Select a courier</option>
-                    {couriers.map((courier) => (
-                      <option key={courier.id} value={courier.id}>
-                        {getCourierLabel(courier)}
-                      </option>
-                    ))}
-                  </select>
+                    ariaLabel={t("Select a courier")}
+                    options={[
+                      { value: "", label: t("Select a courier") },
+                      ...assignableCouriers.map((courier) => ({
+                        value: String(courier.id),
+                        label: `${getCourierLabel(courier)}${courier.active_order_count ? ` · ${courier.active_order_count} ${t("active orders")}` : ""}`,
+                      })),
+                    ]}
+                  />
                   <button
                     className="assignment-submit"
                     type="submit"
                     disabled={assigningCourier || !selectedCourierId}
                   >
                     <UserRoundPlus size={15} />
-                    {assigningCourier ? "Assigning..." : "Assign courier"}
+                    {t(assigningCourier ? "Assigning..." : "Assign courier")}
                   </button>
                 </form>
               )}
@@ -440,7 +446,7 @@ export function OrderDetailsPage() {
                   className="assignment-message assignment-message-success"
                   role="status"
                 >
-                  {assignmentNotice}
+                  {t(assignmentNotice)}
                 </p>
               )}
             </section>
@@ -454,23 +460,22 @@ export function OrderDetailsPage() {
               <div className="order-assignment-copy">
                 <div className="detail-panel-heading">
                   <Warehouse size={17} />
-                  <h2 id="drawer-assignment-heading">Locker assignment</h2>
+                  <h2 id="drawer-assignment-heading">{t("Locker assignment")}</h2>
                 </div>
                 <p>
-                  Reserve a compatible available drawer. The locker must be
-                  online and the drawer must fit every item in this order.
+                  {t("Reserve a compatible available drawer. The locker must be online and the drawer must fit every item in this order.")}
                 </p>
                 {requiredDrawerSize && (
                   <div className="drawer-size-callout">
-                    <span>Required drawer size</span>
-                    <strong>{formatLabel(requiredDrawerSize)}</strong>
+                    <span>{t("Required drawer size")}</span>
+                    <strong>{t(formatLabel(requiredDrawerSize))}</strong>
                   </div>
                 )}
               </div>
 
               {onlineLockers.length === 0 ? (
                 <p className="assignment-message assignment-message-error">
-                  No online locker stations are available for assignment.
+                  {t("No online locker stations are available for assignment.")}
                 </p>
               ) : (
                 <form
@@ -478,56 +483,49 @@ export function OrderDetailsPage() {
                   onSubmit={handleDrawerAssignment}
                 >
                   <div className="assignment-field">
-                    <label htmlFor="locker-station-id">Locker station</label>
-                    <select
-                      id="locker-station-id"
+                    <label htmlFor="locker-station-id">{t("Locker station")}</label>
+                    <StyledSelect
+                      className="assignment-select-control"
                       value={selectedLockerId}
-                      onChange={(event) =>
-                        handleLockerChange(event.target.value)
-                      }
+                      onChange={handleLockerChange}
                       disabled={assigningDrawer}
-                    >
-                      <option value="">Select an online locker</option>
-                      {onlineLockers.map((locker) => (
-                        <option key={locker.id} value={locker.id}>
-                          {locker.name} ({locker.available_drawers_count}{" "}
-                          available)
-                        </option>
-                      ))}
-                    </select>
+                      ariaLabel={t("Select an online locker")}
+                      options={[
+                        { value: "", label: t("Select an online locker") },
+                        ...onlineLockers.map((locker) => ({
+                          value: String(locker.id),
+                          label: `${locker.name} (${locker.available_drawers_count} ${t("available")})`,
+                        })),
+                      ]}
+                    />
                   </div>
 
                   <div className="assignment-field">
                     <label htmlFor="drawer-id">
-                      Compatible drawer
+                      {t("Compatible drawer")}
                       {requiredDrawerSize
-                        ? ` (${formatLabel(requiredDrawerSize)} or larger)`
+                        ? ` (${t(formatLabel(requiredDrawerSize))} ${t("or larger")})`
                         : ""}
                     </label>
-                    <select
-                      id="drawer-id"
+                    <StyledSelect
+                      className="assignment-select-control"
                       value={selectedDrawerId}
-                      onChange={(event) =>
-                        setSelectedDrawerId(event.target.value)
-                      }
+                      onChange={setSelectedDrawerId}
                       disabled={
                         assigningDrawer ||
                         drawerLoading ||
                         !selectedLockerId ||
                         compatibleDrawers.length === 0
                       }
-                    >
-                      <option value="">
-                        {drawerLoading
-                          ? "Loading drawers..."
-                          : "Select an available drawer"}
-                      </option>
-                      {compatibleDrawers.map((drawer) => (
-                        <option key={drawer.id} value={drawer.id}>
-                          Drawer {drawer.number} ({formatLabel(drawer.size)})
-                        </option>
-                      ))}
-                    </select>
+                      ariaLabel={t("Select an available drawer")}
+                      options={[
+                        { value: "", label: drawerLoading ? t("Loading drawers...") : t("Select an available drawer") },
+                        ...compatibleDrawers.map((drawer) => ({
+                          value: String(drawer.id),
+                          label: `${t("Drawer")} ${drawer.number} (${t(formatLabel(drawer.size))})`,
+                        })),
+                      ]}
+                    />
                   </div>
 
                   <button
@@ -541,7 +539,7 @@ export function OrderDetailsPage() {
                     }
                   >
                     <Warehouse size={15} />
-                    {assigningDrawer ? "Assigning..." : "Reserve drawer"}
+                    {t(assigningDrawer ? "Assigning..." : "Reserve drawer")}
                   </button>
                 </form>
               )}
@@ -550,8 +548,7 @@ export function OrderDetailsPage() {
                 !drawerLoading &&
                 compatibleDrawers.length === 0 && (
                   <p className="assignment-message assignment-message-error">
-                    This locker has no available drawer large enough for the
-                    order.
+                    {t("This locker has no available drawer large enough for the order.")}
                   </p>
                 )}
 
@@ -560,7 +557,7 @@ export function OrderDetailsPage() {
                   className="assignment-message assignment-message-error"
                   role="alert"
                 >
-                  {drawerAssignmentError}
+                  {t(drawerAssignmentError)}
                 </p>
               )}
             </section>
@@ -569,42 +566,42 @@ export function OrderDetailsPage() {
           {drawerAssignmentNotice && (
             <div className="scope-note assignment-success-note" role="status">
               <Warehouse size={15} />
-              <span>{drawerAssignmentNotice}</span>
+              <span>{t(drawerAssignmentNotice)}</span>
             </div>
           )}
 
-          <section className="details-grid" aria-label="Order details">
+          <section className="details-grid" aria-label={t("Order details")}>
             <article className="detail-panel">
               <div className="detail-panel-heading">
                 <User size={17} />
-                <h3>People</h3>
+                <h3>{t("People")}</h3>
               </div>
-              <DetailRow label="Customer" value={order.customer_username} />
+              <DetailRow label={t("Customer")} value={order.customer_username} />
               <DetailRow
-                label="Courier"
+                label={t("Courier")}
                 value={order.assigned_courier_username}
               />
-              <DetailRow label="Customer ID" value={order.customer} />
-              <DetailRow label="Courier ID" value={order.assigned_courier} />
+              <DetailRow label={t("Customer ID")} value={order.customer} />
+              <DetailRow label={t("Courier ID")} value={order.assigned_courier} />
             </article>
 
             <article className="detail-panel">
               <div className="detail-panel-heading">
                 <Warehouse size={17} />
-                <h3>Locker</h3>
+                <h3>{t("Locker")}</h3>
               </div>
-              <DetailRow label="Locker" value={order.locker?.name} />
-              <DetailRow label="Locker code" value={order.locker?.code} />
-              <DetailRow label="Address" value={order.locker?.address} />
-              <DetailRow label="Drawer" value={order.assigned_drawer_number} />
+              <DetailRow label={t("Locker")} value={order.locker?.name} />
+              <DetailRow label={t("Locker code")} value={order.locker?.code} />
+              <DetailRow label={t("Address")} value={order.locker?.address} />
+              <DetailRow label={t("Drawer")} value={order.assigned_drawer_number} />
             </article>
 
             <article className="detail-panel">
               <div className="detail-panel-heading">
                 <Package size={17} />
-                <h3>Items</h3>
+                <h3>{t("Items")}</h3>
               </div>
-              <DetailRow label="Total items" value={totalItems} />
+              <DetailRow label={t("Total items")} value={totalItems} />
               {order.items.map((item) => (
                 <div
                   className="item-row"
@@ -612,7 +609,7 @@ export function OrderDetailsPage() {
                 >
                   <div>
                     <strong>{item.product_name}</strong>
-                    <span>{formatLabel(item.product_size)}</span>
+                    <span>{t(formatLabel(item.product_size))}</span>
                   </div>
                   <div>
                     <strong>{item.quantity}x</strong>
@@ -625,33 +622,33 @@ export function OrderDetailsPage() {
             <article className="detail-panel">
               <div className="detail-panel-heading">
                 <ClipboardList size={17} />
-                <h3>Timeline</h3>
+                <h3>{t("Timeline")}</h3>
               </div>
               <div className="timeline-list">
-                <TimelineRow label="Created" value={order.created_at} />
+                <TimelineRow label={t("Created")} value={order.created_at} />
                 <TimelineRow
-                  label="Courier assigned"
+                  label={t("Courier assigned")}
                   value={order.courier_assigned_at}
                 />
                 <TimelineRow
-                  label="Drawer assigned"
+                  label={t("Drawer assigned")}
                   value={order.assigned_at}
                 />
                 <TimelineRow
-                  label="Ready for pickup"
+                  label={t("Ready for pickup")}
                   value={order.ready_for_pickup_at}
                 />
                 <TimelineRow
-                  label="Pickup opened"
+                  label={t("Pickup opened")}
                   value={order.pickup_opened_at}
                 />
-                <TimelineRow label="Collected" value={order.collected_at} />
+                <TimelineRow label={t("Collected")} value={order.collected_at} />
                 <TimelineRow
-                  label="Return opened"
+                  label={t("Return opened")}
                   value={order.return_opened_at}
                 />
-                <TimelineRow label="Returned" value={order.returned_at} />
-                <TimelineRow label="Cancelled" value={order.cancelled_at} />
+                <TimelineRow label={t("Returned")} value={order.returned_at} />
+                <TimelineRow label={t("Cancelled")} value={order.cancelled_at} />
               </div>
             </article>
           </section>

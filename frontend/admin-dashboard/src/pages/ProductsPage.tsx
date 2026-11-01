@@ -29,6 +29,8 @@ import {
 } from "../api/products";
 import { useAuth } from "../auth/AuthProvider";
 import { formatDate, formatLabel } from "../lib/format";
+import { useLocale } from "../i18n/LocaleProvider";
+import { StyledSelect } from "../components/StyledSelect";
 
 type ProductFilter = "all" | "active" | "inactive" | "low-stock";
 type CategoryFilter = number | "uncategorized" | null;
@@ -57,6 +59,7 @@ function formatMoney(value: string): string {
 }
 
 export function ProductsPage() {
+  const { t, locale } = useLocale();
   const { tokens } = useAuth();
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [categories, setCategories] = useState<AdminCategory[]>([]);
@@ -208,7 +211,7 @@ export function ProductsPage() {
     try {
       const updated = await setProductActive(tokens.access, product.id, nextActive);
       setProducts((current) => current.map((item) => item.id === updated.id ? updated : item));
-      setNotice(`${updated.name} is now ${updated.is_active ? "available" : "inactive"}.`);
+      setNotice(locale === "ar" ? `${updated.name} ${updated.is_active ? "متاح الآن للعملاء." : "غير نشط الآن."}` : `${updated.name} is now ${updated.is_active ? "available" : "inactive"}.`);
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : "Could not update product availability.");
     } finally {
@@ -240,7 +243,7 @@ export function ProductsPage() {
           ? current.map((product) => (product.id === saved.id ? saved : product))
           : [...current, saved].sort((a, b) => a.name.localeCompare(b.name)),
       );
-      setNotice(editingProduct ? "Product changes saved." : "Product created.");
+      setNotice(locale === "ar" ? (editingProduct ? "تم حفظ تغييرات المنتج." : "تم إنشاء المنتج.") : (editingProduct ? "Product changes saved." : "Product created."));
       closeForm();
     } catch (caughtError) {
       setError(
@@ -259,18 +262,18 @@ export function ProductsPage() {
     <>
       <div className="dashboard-intro">
         <div>
-          <p className="eyebrow">Network control / Catalogue</p>
-          <h1 className="page-title">Products</h1>
+          <p className="eyebrow">{t("Network control / Catalogue")}</p>
+          <h1 className="page-title">{t("Products")}</h1>
           <p className="page-description">
-            Manage catalogue availability, inventory, and parcel size.
+            {t("Manage catalogue availability, inventory, and parcel size.")}
           </p>
         </div>
         <div className="products-page-actions">
           <button className="icon-text-button" type="button" onClick={() => void loadProducts()} disabled={loading}>
-            <RefreshCw size={16} /> Refresh
+            <RefreshCw size={16} /> {t("Refresh")}
           </button>
           <button className="primary-action-button" type="button" onClick={openCreateForm}>
-            <CirclePlus size={16} /> Add product
+            <CirclePlus size={16} /> {t("Add product")}
           </button>
         </div>
       </div>
@@ -282,25 +285,25 @@ export function ProductsPage() {
       )}
       {notice && (
         <div className="products-notice" role="status">
-          <Check size={16} /><span>{notice}</span>
+          <Check size={16} /><span>{t(notice)}</span>
         </div>
       )}
 
-      <section className="products-metrics" aria-label="Catalogue summary">
-        <article><span>Products</span><strong>{totals.all}</strong></article>
-        <article><span>Active</span><strong>{totals.active}</strong></article>
-        <article className={totals.lowStock ? "product-metric-warning" : ""}><span>Low stock (5 or fewer)</span><strong>{totals.lowStock}</strong></article>
-        <article><span>Inventory units</span><strong>{totals.units}</strong></article>
+      <section className="products-metrics" aria-label={t("Catalogue summary")}>
+        <article><span>{t("Products")}</span><strong>{totals.all}</strong></article>
+        <article><span>{t("Active")}</span><strong>{totals.active}</strong></article>
+        <article className={totals.lowStock ? "product-metric-warning" : ""}><span>{t("Low stock (5 or fewer)")}</span><strong>{totals.lowStock}</strong></article>
+        <article><span>{t("Inventory units")}</span><strong>{totals.units}</strong></article>
       </section>
 
       <section className="product-category-shortcuts" aria-labelledby="product-category-heading">
         <div className="product-category-shortcuts-heading">
           <div>
-            <h2 id="product-category-heading">Browse by category</h2>
-            <p>Filter the catalogue by product category.</p>
+            <h2 id="product-category-heading">{t("Browse by category")}</h2>
+            <p>{t("Filter the catalogue by product category.")}</p>
           </div>
           <Link className="product-category-manage" to="/categories">
-            Manage categories <ArrowUpRight size={14} />
+            {t("Manage categories")} <ArrowUpRight size={14} />
           </Link>
         </div>
         <div className="product-category-list">
@@ -311,7 +314,7 @@ export function ProductsPage() {
             onClick={() => setCategoryFilter(null)}
           >
             <span className="product-category-icon"><Package size={16} /></span>
-            <span className="product-category-copy"><strong>All products</strong><small>Every category</small></span>
+            <span className="product-category-copy"><strong>{t("All products")}</strong><small>{t("Every category")}</small></span>
             <span className="product-category-count">{products.length}</span>
           </button>
           {categories.map((category) => {
@@ -325,7 +328,7 @@ export function ProductsPage() {
                 onClick={() => setCategoryFilter(category.id)}
               >
                 <span className="product-category-icon"><FolderTree size={16} /></span>
-                <span className="product-category-copy"><strong>{category.name}</strong><small>{category.is_active ? "Active category" : "Inactive category"}</small></span>
+                <span className="product-category-copy"><strong>{category.name}</strong><small>{t(category.is_active ? "Active category" : "Inactive category")}</small></span>
                 <span className="product-category-count">{count}</span>
               </button>
             );
@@ -338,7 +341,7 @@ export function ProductsPage() {
               onClick={() => setCategoryFilter("uncategorized")}
             >
               <span className="product-category-icon"><Archive size={16} /></span>
-              <span className="product-category-copy"><strong>Uncategorized</strong><small>Not assigned yet</small></span>
+              <span className="product-category-copy"><strong>{t("Uncategorized")}</strong><small>{t("Not assigned yet")}</small></span>
               <span className="product-category-count">{uncategorizedCount}</span>
             </button>
           )}
@@ -349,18 +352,18 @@ export function ProductsPage() {
         <section className="product-form-panel" aria-labelledby="product-form-title">
           <div className="product-form-heading">
             <div>
-              <p className="eyebrow">Catalogue management</p>
-              <h2 id="product-form-title">{editing ? "Edit product" : "New product"}</h2>
+              <p className="eyebrow">{t("Catalogue management")}</p>
+              <h2 id="product-form-title">{t(editing ? "Edit product" : "New product")}</h2>
             </div>
-            <button className="icon-button" type="button" aria-label="Close form" onClick={closeForm}><X size={17} /></button>
+            <button className="icon-button" type="button" aria-label={t("Close form")} onClick={closeForm}><X size={17} /></button>
           </div>
           <form className="product-form" onSubmit={handleSubmit}>
             <label className="product-form-field product-form-name">
-              <span>Product name</span>
+              <span>{t("Product name")}</span>
               <input required maxLength={255} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
             </label>
             <div className="product-image-field">
-              <span className="product-image-label">Product image</span>
+              <span className="product-image-label">{t("Product image")}</span>
               <div
                 className={`product-image-dropzone${imageDragOver ? " is-dragging" : ""}`}
                 onDragOver={(event) => {
@@ -380,19 +383,19 @@ export function ProductsPage() {
               >
                 <div className="product-image-preview">
                   {imagePreview || (editingProduct?.image && !form.clear_image) ? (
-                    <img src={imagePreview || editingProduct?.image || ""} alt="Product preview" />
+                    <img src={imagePreview || editingProduct?.image || ""} alt={t("Product preview")} />
                   ) : <Package size={25} aria-hidden="true" />}
                 </div>
                 <div className="product-image-inputs">
-                  <strong>{form.image?.name || (editingProduct?.image && !form.clear_image ? "Current product image" : "Add a product photo")}</strong>
-                  <small>{form.image ? `${(form.image.size / (1024 * 1024)).toFixed(2)} MB` : "JPG, PNG, or WebP | up to 5 MB"}</small>
+                  <strong>{form.image?.name || t(editingProduct?.image && !form.clear_image ? "Current product image" : "Add a product photo")}</strong>
+                  <small>{form.image ? `${(form.image.size / (1024 * 1024)).toFixed(2)} MB` : t("JPG, PNG, or WebP | up to 5 MB")}</small>
                   <label className="product-image-choose">
                     {form.image || (editingProduct?.image && !form.clear_image) ? <ImagePlus size={15} /> : <Upload size={15} />}
-                    {form.image || (editingProduct?.image && !form.clear_image) ? "Change image" : "Choose image"}
+                    {t(form.image || (editingProduct?.image && !form.clear_image) ? "Change image" : "Choose image")}
                     <input
                       type="file"
                       accept="image/jpeg,image/png,image/webp"
-                      aria-label="Choose product image"
+                      aria-label={t("Choose product image")}
                       onChange={(event) => {
                         selectProductImage(event.target.files?.[0]);
                         event.currentTarget.value = "";
@@ -400,7 +403,7 @@ export function ProductsPage() {
                     />
                   </label>
                 </div>
-                <span className="product-image-drop-hint">or drag and drop here</span>
+                <span className="product-image-drop-hint">{t("or drag and drop here")}</span>
               </div>
               {editingProduct?.image && (
                 <label className="product-image-remove">
@@ -413,53 +416,51 @@ export function ProductsPage() {
                       image: event.target.checked ? null : form.image,
                     })}
                   />
-                  Remove current image
+                  {t("Remove current image")}
                 </label>
               )}
             </div>
             <label className="product-form-field">
-              <span>Price (EGP)</span>
+              <span>{t("Price (EGP)")}</span>
               <input required type="number" min="0" step="0.01" value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} />
             </label>
             <label className="product-form-field">
-              <span>Stock units</span>
+              <span>{t("Stock units")}</span>
               <input required type="number" min="0" step="1" value={form.stock} onChange={(event) => setForm({ ...form, stock: Number(event.target.value) })} />
             </label>
             <label className="product-form-field">
-              <span>Category</span>
-              <select
-                value={form.category_id ?? ""}
-                onChange={(event) => setForm({
-                  ...form,
-                  category_id: event.target.value ? Number(event.target.value) : null,
-                })}
-              >
-                <option value="">Uncategorized</option>
-                {categories.filter((category) => category.is_active || category.id === form.category_id).map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}{category.is_active ? "" : " (inactive)"}
-                  </option>
-                ))}
-              </select>
+              <span>{t("Category")}</span>
+              <StyledSelect
+                ariaLabel={t("Category")}
+                value={form.category_id === null ? "" : String(form.category_id)}
+                onChange={(value) => setForm({ ...form, category_id: value ? Number(value) : null })}
+                options={[
+                  { value: "", label: t("Uncategorized") },
+                  ...categories.filter((category) => category.is_active || category.id === form.category_id).map((category) => ({
+                    value: String(category.id),
+                    label: `${category.name}${category.is_active ? "" : ` (${t("Inactive")})`}`,
+                  })),
+                ]}
+              />
             </label>
             <label className="product-form-field">
-              <span>Parcel size</span>
-              <select value={form.size} onChange={(event) => setForm({ ...form, size: event.target.value as ProductSize })}>
-                <option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option>
-              </select>
+              <span>{t("Parcel size")}</span>
+              <StyledSelect ariaLabel={t("Parcel size")} value={form.size} onChange={(value) => setForm({ ...form, size: value as ProductSize })} options={[
+                { value: "small", label: t("Small") }, { value: "medium", label: t("Medium") }, { value: "large", label: t("Large") },
+              ]} />
             </label>
             <label className="product-form-field product-form-description">
-              <span>Description</span>
+              <span>{t("Description")}</span>
               <textarea rows={3} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />
             </label>
             <label className="product-active-toggle">
               <input type="checkbox" checked={form.is_active} onChange={(event) => setForm({ ...form, is_active: event.target.checked })} />
-              <span><strong>Available to customers</strong><small>Inactive products remain visible to admins only.</small></span>
+              <span><strong>{t("Available to customers")}</strong><small>{t("Inactive products remain visible to admins only.")}</small></span>
             </label>
             <div className="product-form-actions">
-              <button className="icon-text-button" type="button" onClick={closeForm} disabled={saving}>Cancel</button>
+              <button className="icon-text-button" type="button" onClick={closeForm} disabled={saving}>{t("Cancel")}</button>
               <button className="primary-action-button" type="submit" disabled={saving}>
-                {saving ? "Saving..." : editing ? "Save changes" : "Create product"}
+                {t(saving ? "Saving..." : editing ? "Save changes" : "Create product")}
               </button>
             </div>
           </form>
@@ -469,47 +470,48 @@ export function ProductsPage() {
       <section className="products-catalogue-panel" aria-labelledby="catalogue-heading">
         <div className="products-panel-heading">
           <div>
-            <h2 id="catalogue-heading">Catalogue</h2>
-            <p>{loading ? "Loading products..." : `${visibleProducts.length} of ${products.length} products`}</p>
+            <h2 id="catalogue-heading">{t("Catalogue")}</h2>
+            <p>{loading ? t("Loading products...") : locale === "ar" ? `${visibleProducts.length} من ${products.length} منتج` : `${visibleProducts.length} of ${products.length} products`}</p>
           </div>
           <div className="products-filters">
-            <label className="products-search"><Search size={16} /><input aria-label="Search products" placeholder="Search products" value={search} onChange={(event) => setSearch(event.target.value)} /></label>
-            <select aria-label="Filter products" value={filter} onChange={(event) => setFilter(event.target.value as ProductFilter)}>
-              <option value="all">All products</option><option value="active">Active</option><option value="inactive">Inactive</option><option value="low-stock">Low stock (5 or fewer)</option>
-            </select>
+            <label className="products-search"><Search size={16} /><input aria-label={t("Search products")} placeholder={t("Search products")} value={search} onChange={(event) => setSearch(event.target.value)} /></label>
+            <StyledSelect className="products-filter-select-trigger" ariaLabel={t("Filter products")} value={filter} onChange={(value) => setFilter(value as ProductFilter)} options={[
+              { value: "all", label: t("All products") }, { value: "active", label: t("Active") },
+              { value: "inactive", label: t("Inactive") }, { value: "low-stock", label: t("Low stock (5 or fewer)") },
+            ]} />
           </div>
         </div>
 
         {loading ? (
-          <div className="products-empty-state"><Package size={20} /><span>Loading catalogue...</span></div>
+          <div className="products-empty-state"><Package size={20} /><span>{t("Loading catalogue...")}</span></div>
         ) : visibleProducts.length === 0 ? (
-          <div className="products-empty-state"><Archive size={20} /><span>{products.length ? "No products match this view." : "No products in the catalogue yet."}</span></div>
+          <div className="products-empty-state"><Archive size={20} /><span>{t(products.length ? "No products match this view." : "No products in the catalogue yet.")}</span></div>
         ) : (
           <div className="table-shell">
             <table className="data-table products-table">
-              <thead><tr><th>Product</th><th>Category</th><th>Price</th><th>Stock</th><th>Parcel size</th><th>Availability</th><th>Updated</th><th>Action</th></tr></thead>
+              <thead><tr><th>{t("Product")}</th><th>{t("Category")}</th><th>{t("Price")}</th><th>{t("Stock")}</th><th>{t("Parcel size")}</th><th>{t("Availability")}</th><th>{t("Updated")}</th><th>{t("Action")}</th></tr></thead>
               <tbody>
                 {visibleProducts.map((product) => (
                   <tr key={product.id}>
-                    <td><div className="product-name-cell"><span className="product-row-icon">{product.image ? <img src={product.image} alt="" /> : <Package size={17} />}</span><span><strong>{product.name}</strong><small>{product.description || "No description"}</small></span></div></td>
-                    <td>{product.category_name || <span className="category-unassigned">Uncategorized</span>}</td>
+                    <td><div className="product-name-cell"><span className="product-row-icon">{product.image ? <img src={product.image} alt="" /> : <Package size={17} />}</span><span><strong>{product.name}</strong><small>{product.description || t("No description")}</small></span></div></td>
+                    <td>{product.category_name || <span className="category-unassigned">{t("Uncategorized")}</span>}</td>
                     <td className="product-price-cell">{formatMoney(product.price)}</td>
-                    <td><span className={product.stock <= 5 ? "product-stock-low" : "product-stock"}>{product.stock} units</span></td>
-                    <td>{formatLabel(product.size)}</td>
-                    <td><span className={`product-state ${product.is_active ? "product-state-active" : "product-state-inactive"}`}>{product.is_active ? "Active" : "Inactive"}</span></td>
+                    <td><span className={product.stock <= 5 ? "product-stock-low" : "product-stock"}>{product.stock} {t("units")}</span></td>
+                    <td>{t(formatLabel(product.size))}</td>
+                    <td><span className={`product-state ${product.is_active ? "product-state-active" : "product-state-inactive"}`}>{t(product.is_active ? "Active" : "Inactive")}</span></td>
                     <td>{formatDate(product.updated_at)}</td>
                     <td>
                       <div className="product-row-actions">
-                        <button className="product-edit-button" type="button" onClick={() => openEditForm(product)} aria-label={`Edit ${product.name}`}><Pencil size={15} /> Edit</button>
+                        <button className="product-edit-button" type="button" onClick={() => openEditForm(product)} aria-label={`${t("Edit")} ${product.name}`}><Pencil size={15} /> {t("Edit")}</button>
                         <button
                           className={`product-availability-action${product.is_active ? " deactivate" : " reactivate"}`}
                           type="button"
                           disabled={updatingProductId === product.id}
                           onClick={() => void toggleProductAvailability(product)}
-                          aria-label={`${product.is_active ? "Deactivate" : "Reactivate"} ${product.name}`}
+                          aria-label={`${t(product.is_active ? "Deactivate" : "Reactivate")} ${product.name}`}
                         >
                           {product.is_active ? <Archive size={14} /> : <Check size={14} />}
-                          {updatingProductId === product.id ? "Saving..." : product.is_active ? "Deactivate" : "Reactivate"}
+                          {t(updatingProductId === product.id ? "Saving..." : product.is_active ? "Deactivate" : "Reactivate")}
                         </button>
                       </div>
                     </td>

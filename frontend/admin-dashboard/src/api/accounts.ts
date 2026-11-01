@@ -9,6 +9,11 @@ export interface AdminCourier {
   email: string;
   phone: string;
   role: "courier";
+  is_active: boolean;
+  is_on_shift: boolean;
+  shift_updated_at: string | null;
+  active_order_count: number;
+  dispatch_status: "inactive" | "off_shift" | "busy" | "available";
 }
 
 export function getAdminCouriers(accessToken: string): Promise<AdminCourier[]> {
@@ -17,9 +22,10 @@ export function getAdminCouriers(accessToken: string): Promise<AdminCourier[]> {
 
 export type ManagedAccountRole = "customer" | "courier" | "admin";
 
-export interface ManagedAccount extends Omit<AdminCourier, "role"> {
+export interface ManagedAccount extends Omit<AdminCourier, "role" | "dispatch_status"> {
   role: ManagedAccountRole;
   is_active: boolean;
+  dispatch_status: AdminCourier["dispatch_status"] | "not_applicable";
 }
 
 export interface ManagedAccountInput {
@@ -53,6 +59,18 @@ export function updateManagedAccountStatus(
     `/api/accounts/admin/users/${userId}/status/`,
     accessToken,
     { is_active: isActive },
+  );
+}
+
+export function updateCourierShift(
+  accessToken: string,
+  userId: number,
+  isOnShift: boolean,
+): Promise<ManagedAccount> {
+  return apiPatch<ManagedAccount>(
+    `/api/accounts/admin/couriers/${userId}/shift/`,
+    accessToken,
+    { is_on_shift: isOnShift },
   );
 }
 

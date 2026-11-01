@@ -41,6 +41,13 @@
 .people-status-action.deactivate { border-color: #f4d6d8; color: #b42335; }
 .people-status-action.activate { border-color: #ccebdc; color: #08764d; }
 .people-status-action:disabled { opacity: 0.6; cursor: wait; }
+.people-dispatch-state { display: inline-flex; align-items: center; gap: 0.35rem; color: #718096; font-size: 0.62rem; font-weight: 700; white-space: nowrap; }
+.people-dispatch-state > span { width: 0.42rem; height: 0.42rem; border-radius: 50%; background: #94a3b8; }
+.people-dispatch-state.dispatch-available { color: #08764d; }
+.people-dispatch-state.dispatch-available > span { background: #16a56b; }
+.people-dispatch-state.dispatch-busy { color: #a45b00; }
+.people-dispatch-state.dispatch-busy > span { background: #f59e0b; }
+.people-actions-cell { display: flex; align-items: center; gap: 0.35rem; }
 .people-current-account { color: #7d8da3; font-size: 0.62rem; font-weight: 650; white-space: nowrap; }
 .people-empty { display: flex; min-height: 9rem; flex-direction: column; align-items: center; justify-content: center; gap: 0.45rem; color: #8190a5; font-size: 0.7rem; }
 .people-empty svg { color: #6d8fbd; }
