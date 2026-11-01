@@ -12,6 +12,7 @@ from .views import (
     CourierAssignmentListAPIView,
     OrderCancellationAPIView,
     AdminOrderListAPIView,
+    OrderTrackingAPIView,
 )
 
 
@@ -37,6 +38,11 @@ urlpatterns = [
     "<uuid:public_id>/pickup-qr/",
     OrderPickupQRAPIView.as_view(),
     name="order-pickup-qr",
+    ),
+    path(
+        "<uuid:public_id>/tracking/",
+        OrderTrackingAPIView.as_view(),
+        name="order-tracking",
     ),
     path(
         "<uuid:public_id>/",

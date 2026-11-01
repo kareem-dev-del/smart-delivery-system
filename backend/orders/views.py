@@ -8,6 +8,7 @@ from lockers.openapi import LOCKER_DEVICE_IDEMPOTENCY_KEY_PARAMETER
 
 
 from django.db import transaction
+from django.shortcuts import get_object_or_404
 
 from lockers.idempotency import (
     build_request_hash,
@@ -42,6 +43,7 @@ from .serializers import (
     CourierReturnQRResponseSerializer,
     CourierAssignmentOrderSerializer,
     OrderAdminReadSerializer,
+    OrderTrackingSerializer,
     AdminOrderListFilterSerializer,
 )
 from .services import (
@@ -223,6 +225,26 @@ class OrderDetailAPIView(generics.RetrieveAPIView):
             return queryset
 
         return queryset.filter(customer=self.request.user)
+
+
+@extend_schema(
+    tags=["Orders"],
+    responses={status.HTTP_200_OK: OrderTrackingSerializer},
+)
+class OrderTrackingAPIView(APIView):
+    permission_classes = [IsCustomer]
+
+    def get(self, request, public_id):
+        order = get_object_or_404(
+            Order.objects.select_related(
+                "assigned_courier",
+                "locker_station",
+                "assigned_drawer",
+            ),
+            public_id=public_id,
+            customer=request.user,
+        )
+        return Response(OrderTrackingSerializer(order).data)
 
 
 class OrderDrawerAssignmentAPIView(generics.GenericAPIView):
@@ -546,4 +568,4 @@ class OrderReturnQRAPIView(APIView):
             response_serializer.data,
             status=status.HTTP_200_OK,
             headers={"Cache-Control": "no-store"},
-        )   
+        )

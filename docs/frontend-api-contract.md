@@ -9,8 +9,7 @@ The goal is to help the frontend team build the Web Admin Dashboard, Flutter Cus
 | Surface | Users | Purpose |
 | --- | --- | --- |
 | Web Admin Dashboard | admin, operations, support | Manage orders, lockers, drawers, devices, couriers, notifications, and audit logs. |
-| Flutter Customer App | customer | Browse products, create orders, track orders, generate pickup QR codes, and read notifications. |
-| Flutter Courier App | courier | View assigned orders, deposit packages, and handle expired returns. |
+| Flutter Mobile App | customer, courier | Routes customers to shopping and couriers to their assigned delivery and return work based on the authenticated account role. |
 | Locker Device Screen | locker_device | Send heartbeat, scan QR tokens, open drawers, and confirm collection or return actions. |
 
 ## 2. Base URLs
@@ -310,6 +309,7 @@ Request body:
 
 ```json
 {
+  "locker_station_id": 1,
   "items": [
     {
       "product_id": 1,
@@ -324,9 +324,14 @@ Response main fields:
 ```json
 {
   "public_id": "uuid",
-  "status": "awaiting_locker",
+  "status": "assigned",
   "total_amount": "250.00",
-  "locker": null,
+  "locker": {
+    "id": 1,
+    "name": "Demo Locker Maadi",
+    "code": "DEMO-MAADI-001",
+    "address": "Maadi, Cairo"
+  },
   "items": [
     {
       "product": 1,
@@ -339,6 +344,21 @@ Response main fields:
   ]
 }
 ```
+
+Before submitting, the customer app requests eligible pickup stations for the
+products in the cart. The backend filters online stations with an available
+drawer large enough for the largest item and sorts them by distance when a
+location is supplied:
+
+```http
+GET /api/lockers/nearby/?product_ids=1,2&latitude=29.960235&longitude=31.256537
+Authorization: Bearer <customer_access_token>
+```
+
+Location coordinates are optional; without them, eligible stations are listed
+without a distance sort. The order endpoint revalidates capacity and reserves a
+compatible drawer atomically. If capacity changed after the list was loaded,
+the order is rejected and the customer must choose another station.
 
 ### 7.4 Customer Orders List
 
@@ -378,7 +398,43 @@ Important fields:
 - `cancelled_at`
 - `items`
 
-### 7.6 Cancel Order
+### 7.6 Order Tracking
+
+Screen: Customer order tracking. Customers can only track their own orders.
+
+```http
+GET /api/orders/{public_id}/tracking/
+Authorization: Bearer <customer_access_token>
+```
+
+The response includes the current order status, assigned courier when present,
+the selected locker and reserved drawer, and timeline timestamps. It does not
+provide live courier GPS; the timeline reflects persisted order events.
+
+```json
+{
+  "order_id": "uuid",
+  "tracking_number": "uuid",
+  "status": "assigned",
+  "courier": "courier username",
+  "estimated_delivery": null,
+  "locker_name": "Maadi Test Locker",
+  "locker_address": "Maadi, Cairo",
+  "locker_code": "TEST-MAADI-02",
+  "drawer_number": 1,
+  "steps": [
+    {
+      "title": "Order placed",
+      "description": "Your order was created.",
+      "timestamp": "...",
+      "isCompleted": true,
+      "isCurrent": false
+    }
+  ]
+}
+```
+
+### 7.7 Cancel Order
 
 Screen action: Cancel order button.
 
@@ -387,7 +443,7 @@ POST /api/orders/{public_id}/cancel/
 Authorization: Bearer <customer_access_token>
 ```
 
-### 7.7 Pickup QR
+### 7.8 Pickup QR
 
 Screen: Pickup QR.
 
@@ -415,7 +471,7 @@ Frontend notes:
 - Treat token as sensitive data.
 - Do not log QR tokens.
 
-### 7.8 Customer Notifications
+### 7.9 Customer Notifications
 
 Screen: Notifications list.
 
@@ -484,6 +540,8 @@ Response item fields:
   "locker_name": "Demo Locker Maadi",
   "locker_code": "DEMO-MAADI-001",
   "locker_address": "Maadi, Cairo, Egypt",
+  "locker_latitude": "30.062630",
+  "locker_longitude": "31.335220",
   "drawer_number": 1,
   "courier_assigned_at": "...",
   "assigned_at": "...",
@@ -606,7 +664,41 @@ GET /api/accounts/admin/couriers/
 Authorization: Bearer <admin_access_token>
 ```
 
-Each item includes the courier `id`, `username`, profile details, and `role`.
+Each item includes profile details plus `is_active`, `is_on_shift`,
+`shift_updated_at`, `active_order_count`, and a derived `dispatch_status`
+(`inactive`, `off_shift`, `busy`, or `available`). A courier is available only
+when active, on shift, and without another open order.
+
+Start or end a courier's shift:
+
+```http
+PATCH /api/accounts/admin/couriers/{user_id}/shift/
+Authorization: Bearer <admin_access_token>
+Content-Type: application/json
+```
+
+```json
+{ "is_on_shift": true }
+```
+
+Ending a shift is rejected while the courier has active orders. Shift changes
+are written to the audit log. Courier assignment also enforces account status,
+shift state, and workload on the backend; the dashboard filter is not a security
+boundary. GPS-based proximity matching is not implemented yet.
+
+The courier mobile app reads and changes only its own shift:
+
+```http
+GET /api/accounts/couriers/me/shift/
+PATCH /api/accounts/couriers/me/shift/
+Authorization: Bearer <courier_access_token>
+```
+
+```json
+{ "is_on_shift": true }
+```
+
+The API rejects ending a shift while active orders remain.
 
 ### 9.4 Admin People Management
 
@@ -691,6 +783,13 @@ List locker stations:
 
 ```http
 GET /api/lockers/
+```
+
+Eligible pickup stations for a customer's cart:
+
+```http
+GET /api/lockers/nearby/?product_ids=1,2&latitude=29.960235&longitude=31.256537
+Authorization: Bearer <customer_access_token>
 ```
 
 Locker detail:

@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework import status
@@ -5,6 +7,7 @@ from rest_framework.test import APITestCase
 
 from accounts.models import UserProfile
 from .models import Drawer, LockerStation
+from products.models import Product
 
 
 User = get_user_model()
@@ -110,6 +113,47 @@ class LockerStationAPIViewTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_customer_gets_nearby_online_lockers_with_compatible_capacity(self):
+        product = Product.objects.create(
+            name="Small parcel",
+            price=Decimal("10.00"),
+            stock=2,
+            size=Product.Size.SMALL,
+        )
+        self.client.force_authenticate(user=self.customer)
+
+        response = self.client.get(
+            reverse("locker-nearby"),
+            {
+                "product_ids": str(product.id),
+                "latitude": "30.062630",
+                "longitude": "31.335220",
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["id"], self.online_locker.id)
+        self.assertEqual(response.data[0]["available_drawers_count"], 1)
+        self.assertEqual(response.data[0]["distance_km"], 0)
+
+    def test_customer_does_not_see_lockers_without_a_large_enough_drawer(self):
+        product = Product.objects.create(
+            name="Large parcel",
+            price=Decimal("10.00"),
+            stock=2,
+            size=Product.Size.LARGE,
+        )
+        self.client.force_authenticate(user=self.customer)
+
+        response = self.client.get(
+            reverse("locker-nearby"),
+            {"product_ids": str(product.id)},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, [])
 
     def test_admin_can_retrieve_offline_locker(self):
         self.client.force_authenticate(user=self.admin_user)

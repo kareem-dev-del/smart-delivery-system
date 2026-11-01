@@ -95,7 +95,7 @@ def validate_order_items(items):
 
 
 @transaction.atomic
-def create_order(*, customer, items):
+def create_order(*, customer, items, locker_station_id=None):
     if not customer or not customer.pk:
         raise ValidationError(
             {"customer": "A valid customer is required."}
@@ -156,6 +156,61 @@ def create_order(*, customer, items):
 
         product.stock -= item["quantity"]
         product.save(update_fields=("stock", "updated_at"))
+
+    if locker_station_id is not None:
+        try:
+            locker_station = LockerStation.objects.select_for_update().get(
+                id=locker_station_id,
+                status=LockerStation.Status.ONLINE,
+            )
+        except LockerStation.DoesNotExist as error:
+            raise ValidationError(
+                {"locker_station_id": "This locker station is unavailable."}
+            ) from error
+
+        required_size = max(
+            (products_by_id[item["product_id"]].size for item in validated_items),
+            key=lambda size: SIZE_RANK[size],
+        )
+        drawer = None
+        compatible_sizes = sorted(
+            (
+                (size, rank)
+                for size, rank in SIZE_RANK.items()
+                if rank >= SIZE_RANK[required_size]
+            ),
+            key=lambda item: item[1],
+        )
+        for size, _ in compatible_sizes:
+            drawer = (
+                Drawer.objects.select_for_update(skip_locked=True)
+                .filter(
+                    locker_station=locker_station,
+                    status=Drawer.Status.AVAILABLE,
+                    size=size,
+                )
+                .order_by("number")
+                .first()
+            )
+            if drawer is not None:
+                break
+
+        if drawer is None:
+            raise ValidationError(
+                {
+                    "locker_station_id": (
+                        "This locker has no available drawer large enough "
+                        "for the selected products. Choose another locker."
+                    )
+                }
+            )
+
+        order = assign_order_to_drawer(
+            order_public_id=order.public_id,
+            locker_station_id=locker_station.id,
+            drawer_id=drawer.id,
+            actor=customer,
+        )
 
     return order
 
@@ -978,7 +1033,11 @@ def assign_courier_to_order(*,order_public_id, courier_id,actor=None):
         )
 
     try:
-        courier = User.objects.select_related("profile").get(id=courier_id)
+        courier = (
+            User.objects.select_for_update(of=("self",))
+            .select_related("profile")
+            .get(id=courier_id)
+        )
     except User.DoesNotExist as error:
         raise ValidationError(
             {"courier_id": "Courier not found."}
@@ -993,6 +1052,25 @@ def assign_courier_to_order(*,order_public_id, courier_id,actor=None):
         raise ValidationError(
             {"courier_id": "Selected user is not a courier."}
         )
+
+    if order.assigned_courier_id == courier.id:
+        return order
+
+    if not courier.is_active:
+        raise ValidationError({"courier_id": "Selected courier account is inactive."})
+    if not profile.is_on_shift:
+        raise ValidationError({"courier_id": "Selected courier is not on shift."})
+
+    active_courier_statuses = (
+        Order.Status.AWAITING_LOCKER,
+        Order.Status.ASSIGNED,
+        Order.Status.EXPIRED,
+    )
+    if Order.objects.filter(
+        assigned_courier=courier,
+        status__in=active_courier_statuses,
+    ).exclude(pk=order.pk).exists():
+        raise ValidationError({"courier_id": "Selected courier already has an active order."})
 
     order.assigned_courier = courier
     order.courier_assigned_at = timezone.now()

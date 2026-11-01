@@ -20,6 +20,8 @@ class UserProfile(models.Model):
         default=Role.CUSTOMER,
     )
     phone = models.CharField(max_length=20, blank=True)
+    is_on_shift = models.BooleanField(default=False)
+    shift_updated_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

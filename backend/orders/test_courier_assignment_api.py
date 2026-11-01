@@ -38,7 +38,8 @@ class OrderCourierAssignmentAPIViewTests(APITestCase):
         self.admin_user.profile.save(update_fields=("role",))
 
         self.courier.profile.role = UserProfile.Role.COURIER
-        self.courier.profile.save(update_fields=("role",))
+        self.courier.profile.is_on_shift = True
+        self.courier.profile.save(update_fields=("role", "is_on_shift"))
 
         self.order = Order.objects.create(
             customer=self.customer,
@@ -110,3 +111,36 @@ class OrderCourierAssignmentAPIViewTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_admin_cannot_assign_courier_who_is_off_shift(self):
+        self.courier.profile.is_on_shift = False
+        self.courier.profile.save(update_fields=("is_on_shift",))
+        self.client.force_authenticate(user=self.admin_user)
+
+        response = self.client.post(self.assignment_url(), {"courier_id": self.courier.id}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("not on shift", str(response.data).lower())
+
+    def test_admin_cannot_assign_courier_with_another_active_order(self):
+        Order.objects.create(
+            customer=self.customer,
+            status=Order.Status.ASSIGNED,
+            assigned_courier=self.courier,
+        )
+        self.client.force_authenticate(user=self.admin_user)
+
+        response = self.client.post(self.assignment_url(), {"courier_id": self.courier.id}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("active order", str(response.data).lower())
+        self.assertIsNone(Order.objects.get(pk=self.order.pk).assigned_courier)
+
+    def test_reassigning_order_to_same_courier_is_idempotent(self):
+        self.order.assigned_courier = self.courier
+        self.order.save(update_fields=("assigned_courier",))
+        self.client.force_authenticate(user=self.admin_user)
+
+        response = self.client.post(self.assignment_url(), {"courier_id": self.courier.id}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)

@@ -15,6 +15,7 @@ class OrderItemCreateSerializer(serializers.Serializer):
 
 class OrderCreateSerializer(serializers.Serializer):
     items = OrderItemCreateSerializer(many=True, allow_empty=False)
+    locker_station_id = serializers.IntegerField(min_value=1)
 
     def validate_items(self, items):
         product_ids = [item["product_id"] for item in items]
@@ -31,6 +32,7 @@ class OrderCreateSerializer(serializers.Serializer):
             return create_order(
                 customer=validated_data["customer"],
                 items=validated_data["items"],
+                locker_station_id=validated_data.get("locker_station_id"),
             )
         except DjangoValidationError as error:
             detail = getattr(error, "message_dict", error.messages)
@@ -95,6 +97,105 @@ class OrderReadSerializer(serializers.ModelSerializer):
             "items",
         )
         read_only_fields = fields
+
+
+class OrderTrackingStepSerializer(serializers.Serializer):
+    title = serializers.CharField()
+    description = serializers.CharField(allow_null=True)
+    timestamp = serializers.DateTimeField(allow_null=True)
+    isCompleted = serializers.BooleanField()
+    isCurrent = serializers.BooleanField()
+
+
+class OrderTrackingSerializer(serializers.ModelSerializer):
+    order_id = serializers.UUIDField(source="public_id", read_only=True)
+    tracking_number = serializers.UUIDField(source="public_id", read_only=True)
+    courier = serializers.SerializerMethodField()
+    estimated_delivery = serializers.DateTimeField(
+        source="delivery_deadline", read_only=True, allow_null=True
+    )
+    locker_name = serializers.CharField(
+        source="locker_station.name", read_only=True, allow_null=True
+    )
+    locker_address = serializers.CharField(
+        source="locker_station.address", read_only=True, allow_null=True
+    )
+    locker_code = serializers.CharField(
+        source="locker_station.code", read_only=True, allow_null=True
+    )
+    drawer_number = serializers.IntegerField(
+        source="assigned_drawer.number", read_only=True, allow_null=True
+    )
+    steps = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Order
+        fields = (
+            "order_id",
+            "tracking_number",
+            "status",
+            "courier",
+            "estimated_delivery",
+            "locker_name",
+            "locker_address",
+            "locker_code",
+            "drawer_number",
+            "steps",
+        )
+
+    def get_courier(self, order):
+        courier = order.assigned_courier
+        if courier is None:
+            return None
+        return courier.get_full_name().strip() or courier.username
+
+    def get_steps(self, order):
+        steps = [
+            ("Order placed", "Your order was created.", order.created_at),
+            (
+                "Locker assigned",
+                "A station and drawer were reserved for your order.",
+                order.assigned_at,
+            ),
+            (
+                "Courier assigned",
+                "A courier was assigned to deliver your order to the locker.",
+                order.courier_assigned_at,
+            ),
+            (
+                "Ready for pickup",
+                "The locker confirmed the package is ready.",
+                order.ready_for_pickup_at,
+            ),
+            ("Collected", "Your order was collected.", order.collected_at),
+        ]
+
+        current_index = next(
+            (
+                index
+                for index, (_, _, timestamp) in enumerate(steps)
+                if timestamp is None
+            ),
+            None,
+        )
+        terminal_statuses = (
+            Order.Status.CANCELLED,
+            Order.Status.EXPIRED,
+            Order.Status.RETURNED,
+        )
+        if order.status in terminal_statuses:
+            current_index = None
+
+        return [
+            {
+                "title": title,
+                "description": description,
+                "timestamp": timestamp,
+                "isCompleted": timestamp is not None,
+                "isCurrent": index == current_index,
+            }
+            for index, (title, description, timestamp) in enumerate(steps)
+        ]
 
 
 class OrderAdminReadSerializer(OrderReadSerializer):
@@ -177,6 +278,20 @@ class CourierAssignmentOrderSerializer(serializers.ModelSerializer):
         read_only=True,
         allow_null=True,
     )
+    locker_latitude = serializers.DecimalField(
+        source="locker_station.latitude",
+        max_digits=9,
+        decimal_places=6,
+        read_only=True,
+        allow_null=True,
+    )
+    locker_longitude = serializers.DecimalField(
+        source="locker_station.longitude",
+        max_digits=9,
+        decimal_places=6,
+        read_only=True,
+        allow_null=True,
+    )
     drawer_number = serializers.IntegerField(
         source="assigned_drawer.number",
         read_only=True,
@@ -191,6 +306,8 @@ class CourierAssignmentOrderSerializer(serializers.ModelSerializer):
             "locker_name",
             "locker_code",
             "locker_address",
+            "locker_latitude",
+            "locker_longitude",
             "drawer_number",
             "courier_assigned_at",
             "assigned_at",

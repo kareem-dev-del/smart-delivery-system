@@ -4,6 +4,8 @@ from .views import (
     AdminManagedAccountListCreateAPIView,
     AdminManagedAccountStatusAPIView,
     AdminCourierListAPIView,
+    AdminCourierShiftAPIView,
+    CourierSelfShiftAPIView,
     ChangePasswordAPIView,
     CustomerRegistrationAPIView,
     LogoutAPIView,
@@ -26,6 +28,16 @@ urlpatterns = [
         "admin/couriers/",
         AdminCourierListAPIView.as_view(),
         name="admin-courier-list",
+    ),
+    path(
+        "admin/couriers/<int:user_id>/shift/",
+        AdminCourierShiftAPIView.as_view(),
+        name="admin-courier-shift",
+    ),
+    path(
+        "couriers/me/shift/",
+        CourierSelfShiftAPIView.as_view(),
+        name="courier-self-shift",
     ),
     path(
         "register/",

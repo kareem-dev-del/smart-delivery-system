@@ -53,12 +53,65 @@ class AccountProfileSerializer(serializers.ModelSerializer):
 class AdminCourierSerializer(AccountProfileSerializer):
     """The courier directory exposed to admin operations screens."""
 
+    is_active = serializers.BooleanField(read_only=True)
+    is_on_shift = serializers.BooleanField(
+        source="profile.is_on_shift",
+        read_only=True,
+    )
+    shift_updated_at = serializers.DateTimeField(
+        source="profile.shift_updated_at",
+        read_only=True,
+        allow_null=True,
+    )
+    active_order_count = serializers.IntegerField(read_only=True, default=0)
+    dispatch_status = serializers.SerializerMethodField()
+
+    class Meta(AccountProfileSerializer.Meta):
+        fields = AccountProfileSerializer.Meta.fields + (
+            "is_active",
+            "is_on_shift",
+            "shift_updated_at",
+            "active_order_count",
+            "dispatch_status",
+        )
+
+    def get_dispatch_status(self, obj):
+        if not obj.is_active:
+            return "inactive"
+        if not obj.profile.is_on_shift:
+            return "off_shift"
+        if getattr(obj, "active_order_count", 0):
+            return "busy"
+        return "available"
+
 
 class AdminManagedAccountSerializer(AccountProfileSerializer):
     is_active = serializers.BooleanField(read_only=True)
+    is_on_shift = serializers.BooleanField(
+        source="profile.is_on_shift",
+        read_only=True,
+    )
+    shift_updated_at = serializers.DateTimeField(
+        source="profile.shift_updated_at",
+        read_only=True,
+        allow_null=True,
+    )
+    active_order_count = serializers.IntegerField(read_only=True, default=0)
+    dispatch_status = serializers.SerializerMethodField()
 
     class Meta(AccountProfileSerializer.Meta):
-        fields = AccountProfileSerializer.Meta.fields + ("is_active",)
+        fields = AccountProfileSerializer.Meta.fields + (
+            "is_active",
+            "is_on_shift",
+            "shift_updated_at",
+            "active_order_count",
+            "dispatch_status",
+        )
+
+    def get_dispatch_status(self, obj):
+        if obj.profile.role != UserProfile.Role.COURIER:
+            return "not_applicable"
+        return AdminCourierSerializer.get_dispatch_status(self, obj)
 
 
 class AdminManagedAccountCreateSerializer(serializers.Serializer):
@@ -119,6 +172,10 @@ class AdminManagedAccountCreateSerializer(serializers.Serializer):
 
 class AdminAccountStatusSerializer(serializers.Serializer):
     is_active = serializers.BooleanField()
+
+
+class AdminCourierShiftSerializer(serializers.Serializer):
+    is_on_shift = serializers.BooleanField()
 
 
 class AuthenticationResponseSerializer(serializers.Serializer):
