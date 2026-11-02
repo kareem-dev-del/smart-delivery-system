@@ -1,5 +1,6 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
+from drf_spectacular.utils import extend_schema_field
 
 from lockers.models import LockerStation
 
@@ -143,13 +144,15 @@ class OrderTrackingSerializer(serializers.ModelSerializer):
             "steps",
         )
 
-    def get_courier(self, order):
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_courier(self, order) -> str | None:
         courier = order.assigned_courier
         if courier is None:
             return None
         return courier.get_full_name().strip() or courier.username
 
-    def get_steps(self, order):
+    @extend_schema_field(OrderTrackingStepSerializer(many=True))
+    def get_steps(self, order) -> list[dict[str, object]]:
         steps = [
             ("Order placed", "Your order was created.", order.created_at),
             (

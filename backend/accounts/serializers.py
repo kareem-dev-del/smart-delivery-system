@@ -75,7 +75,7 @@ class AdminCourierSerializer(AccountProfileSerializer):
             "dispatch_status",
         )
 
-    def get_dispatch_status(self, obj):
+    def get_dispatch_status(self, obj) -> str:
         if not obj.is_active:
             return "inactive"
         if not obj.profile.is_on_shift:
@@ -108,7 +108,7 @@ class AdminManagedAccountSerializer(AccountProfileSerializer):
             "dispatch_status",
         )
 
-    def get_dispatch_status(self, obj):
+    def get_dispatch_status(self, obj) -> str:
         if obj.profile.role != UserProfile.Role.COURIER:
             return "not_applicable"
         return AdminCourierSerializer.get_dispatch_status(self, obj)
