@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 
 import { formatDate, formatLabel } from "../lib/format";
+import { useLocale } from "../i18n/LocaleProvider";
 import {
   getLockerDevices,
   updateLockerDeviceActivation,
@@ -16,6 +17,7 @@ import {
 import { useAuth } from "../auth/AuthProvider";
 
 export function DevicesPage() {
+  const { t } = useLocale();
   const { tokens } = useAuth();
   const [devices, setDevices] = useState<LockerDevice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -109,12 +111,9 @@ export function DevicesPage() {
     <>
       <div className="dashboard-intro">
         <div>
-          <p className="eyebrow">Network control / Devices</p>
-          <h1 className="page-title">Locker devices</h1>
-          <p className="page-description">
-            Monitor device connectivity and manage activation across the
-            SmartDrop locker network.
-          </p>
+          <p className="eyebrow">{t("Network control / Devices")}</p>
+          <h1 className="page-title">{t("Locker devices")}</h1>
+          <p className="page-description">{t("Monitor device connectivity and manage activation across the SmartDrop locker network.")}</p>
         </div>
 
         <button
@@ -124,14 +123,14 @@ export function DevicesPage() {
           disabled={loading}
         >
           <RefreshCw size={16} />
-          Refresh
+          {t("Refresh")}
         </button>
       </div>
 
       {loading && (
         <div className="scope-note">
           <Monitor size={15} />
-          <span>Loading locker devices...</span>
+          <span>{t("Loading locker devices...")}</span>
         </div>
       )}
 
@@ -149,10 +148,10 @@ export function DevicesPage() {
             aria-labelledby="devices-summary-heading"
           >
             <h2 id="devices-summary-heading" className="section-heading">
-              Device health summary
+              {t("Device health summary")}
             </h2>
             <p className="section-subtitle">
-              Connectivity and activation state from the SmartDrop backend.
+              {t("Connectivity and activation state from the SmartDrop backend.")}
             </p>
 
             <div className="module-grid">
@@ -163,9 +162,9 @@ export function DevicesPage() {
                   </div>
                   <span className="metric-value">{totals.total}</span>
                 </div>
-                <h3 className="module-title">Registered devices</h3>
+                <h3 className="module-title">{t("Registered devices")}</h3>
                 <p className="module-copy">
-                  Locker devices registered on the platform.
+                  {t("Locker devices registered on the platform.")}
                 </p>
               </article>
 
@@ -176,9 +175,9 @@ export function DevicesPage() {
                   </div>
                   <span className="metric-value">{totals.active}</span>
                 </div>
-                <h3 className="module-title">Active devices</h3>
+                <h3 className="module-title">{t("Active devices")}</h3>
                 <p className="module-copy">
-                  Devices enabled to handle locker operations.
+                  {t("Devices enabled to handle locker operations.")}
                 </p>
               </article>
 
@@ -195,9 +194,9 @@ export function DevicesPage() {
                   </div>
                   <span className="metric-value">{totals.online}</span>
                 </div>
-                <h3 className="module-title">Online and active</h3>
+                <h3 className="module-title">{t("Online and active")}</h3>
                 <p className="module-copy">
-                  Devices currently available for live operations.
+                  {t("Devices currently available for live operations.")}
                 </p>
               </article>
 
@@ -216,9 +215,9 @@ export function DevicesPage() {
                     {totals.requiresAttention}
                   </span>
                 </div>
-                <h3 className="module-title">Needs attention</h3>
+                <h3 className="module-title">{t("Needs attention")}</h3>
                 <p className="module-copy">
-                  Inactive, stale, offline, or never-connected devices.
+                  {t("Inactive, stale, offline, or never-connected devices.")}
                 </p>
               </article>
             </div>
@@ -229,31 +228,30 @@ export function DevicesPage() {
             aria-labelledby="devices-table-heading"
           >
             <h2 id="devices-table-heading" className="section-heading">
-              Device registry
+              {t("Device registry")}
             </h2>
             <p className="section-subtitle">
-              Activation controls and the latest connection signal for every
-              locker device.
+              {t("Activation controls and the latest connection signal for every locker device.")}
             </p>
 
             {devices.length === 0 ? (
               <div className="empty-panel">
                 <Monitor size={18} />
-                <span>No locker devices found.</span>
+                <span>{t("No locker devices found.")}</span>
               </div>
             ) : (
               <div className="table-shell">
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th>Device</th>
-                      <th>Locker</th>
-                      <th>Station</th>
-                      <th>Active</th>
-                      <th>Connection</th>
-                      <th>Last heartbeat</th>
-                      <th>Updated</th>
-                      <th>Action</th>
+                      <th>{t("Device")}</th>
+                      <th>{t("Locker")}</th>
+                      <th>{t("Station")}</th>
+                      <th>{t("Active")}</th>
+                      <th>{t("Connection")}</th>
+                      <th>{t("Last heartbeat")}</th>
+                      <th>{t("Updated")}</th>
+                      <th>{t("Action")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -277,7 +275,7 @@ export function DevicesPage() {
                             <span
                               className={`status-badge status-${device.locker_station_status}`}
                             >
-                              {formatLabel(device.locker_station_status)}
+                              {t(formatLabel(device.locker_station_status))}
                             </span>
                           </td>
                           <td>
@@ -288,14 +286,14 @@ export function DevicesPage() {
                                   : "state-pill-inactive"
                               }`}
                             >
-                              {device.is_active ? "Active" : "Inactive"}
+                              {t(device.is_active ? "Active" : "Inactive")}
                             </span>
                           </td>
                           <td>
                             <span
                               className={`status-badge status-${device.connection_status}`}
                             >
-                              {formatLabel(device.connection_status)}
+                              {t(formatLabel(device.connection_status))}
                             </span>
                           </td>
                           <td>{formatDate(device.last_heartbeat_at)}</td>
@@ -314,10 +312,10 @@ export function DevicesPage() {
                               disabled={isUpdating}
                             >
                               {isUpdating
-                                ? "Saving..."
+                                ? t("Saving...")
                                 : device.is_active
-                                  ? "Deactivate"
-                                  : "Activate"}
+                                  ? t("Deactivate")
+                                  : t("Activate")}
                             </button>
                           </td>
                         </tr>

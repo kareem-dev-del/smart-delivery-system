@@ -176,14 +176,10 @@
   font-size: 0.8rem;
   font-weight: 700;
 }
-.order-assignment-form select {
+.order-assignment-form .app-select-trigger {
+  grid-column: 1 / -1;
   min-width: 0;
   height: 2.65rem;
-  padding: 0 0.75rem;
-  border: 1px solid var(--sd-border);
-  border-radius: 0.55rem;
-  background: #ffffff;
-  color: var(--foreground);
 }
 .assignment-submit {
   display: inline-flex;
@@ -441,14 +437,9 @@
   font-size: 0.8rem;
   font-weight: 700;
 }
-.assignment-field select {
+.assignment-field .app-select-trigger {
   min-width: 0;
   height: 2.65rem;
-  padding: 0 0.75rem;
-  border: 1px solid var(--sd-border);
-  border-radius: 0.55rem;
-  background: #ffffff;
-  color: var(--foreground);
 }
 .drawer-assignment-form .assignment-submit {
   align-self: end;
@@ -614,10 +605,12 @@
 }
 .orders-search-field { flex: 1; min-width: 10rem; }
 .orders-search-field:focus-within, .orders-status-filter:focus-within { border-color: #8bb5ff; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.09); }
-.orders-search-field input, .orders-status-filter select { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: #283e5b; font: inherit; font-size: 0.72rem; }
+.orders-search-field input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: #283e5b; font: inherit; font-size: 0.72rem; }
 .orders-search-field input::placeholder { color: #96a2b2; }
 .orders-status-filter { min-width: 10rem; }
-.orders-status-filter select { cursor: pointer; }
+.orders-status-select-control { width: 10rem; min-height: 2.3rem; }
+.orders-status-filter .app-select-trigger { min-height: 2.3rem; height: 2.3rem; padding: 0 0.55rem; border: 0; border-radius: 0.4rem; background: transparent; box-shadow: none; font-size: 0.82rem; }
+.orders-status-filter .app-select-trigger:hover:not(:disabled) { background: #f5f8fc; }
 .orders-table-scroll { width: 100%; overflow-x: auto; border: 1px solid #e5ebf3; border-radius: 0.55rem; }
 .orders-data-table { width: 100%; min-width: 920px; border-collapse: collapse; text-align: left; }
 .orders-data-table th { height: 2.55rem; padding: 0 0.7rem; background: #f6f8fb; color: #77879d; font-size: 0.59rem; font-weight: 800; text-transform: uppercase; white-space: nowrap; }

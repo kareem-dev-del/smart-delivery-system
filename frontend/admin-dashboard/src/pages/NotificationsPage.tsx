@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { formatDate, formatLabel } from "../lib/format";
+import { useLocale } from "../i18n/LocaleProvider";
 import { useAuth } from "../auth/AuthProvider";
 import {
   AlertTriangle,
@@ -21,6 +22,7 @@ function getOrderId(notification: AdminNotification): string {
 }
 
 export function NotificationsPage() {
+  const { t, locale } = useLocale();
   const { tokens } = useAuth();
   const [notifications, setNotifications] = useState<AdminNotification[]>([]);
   const [count, setCount] = useState(0);
@@ -78,11 +80,9 @@ export function NotificationsPage() {
     <>
       <div className="dashboard-intro">
         <div>
-          <p className="eyebrow">Network control / Notifications</p>
-          <h1 className="page-title">Notifications</h1>
-          <p className="page-description">
-            Platform-wide delivery monitoring for all SmartDrop recipients.
-          </p>
+          <p className="eyebrow">{t("Network control / Notifications")}</p>
+          <h1 className="page-title">{t("Notifications")}</h1>
+          <p className="page-description">{t("Platform-wide delivery monitoring for all SmartDrop recipients.")}</p>
         </div>
 
         <button
@@ -91,14 +91,14 @@ export function NotificationsPage() {
           onClick={loadNotifications}
         >
           <RefreshCw size={16} />
-          Refresh
+          {t("Refresh")}
         </button>
       </div>
 
       {loading && (
         <div className="scope-note">
           <Bell size={15} />
-          <span>Loading notifications...</span>
+          <span>{t("Loading notifications...")}</span>
         </div>
       )}
 
@@ -116,10 +116,10 @@ export function NotificationsPage() {
             aria-labelledby="notifications-summary-heading"
           >
             <h2 id="notifications-summary-heading" className="section-heading">
-              Notification summary
+              {t("Notification summary")}
             </h2>
             <p className="section-subtitle">
-              {count} notification{count === 1 ? "" : "s"} returned by the API.
+              {locale === "ar" ? `إجمالي الإشعارات: ${count}` : `${count} notification${count === 1 ? "" : "s"} returned by the API.`}
             </p>
 
             <div className="module-grid">
@@ -130,9 +130,9 @@ export function NotificationsPage() {
                   </div>
                   <span className="metric-value">{count}</span>
                 </div>
-                <h3 className="module-title">Total notifications</h3>
+                <h3 className="module-title">{t("Total notifications")}</h3>
                 <p className="module-copy">
-                  Notifications created across the SmartDrop platform.
+                  {t("Notifications created across the SmartDrop platform.")}
                 </p>
               </article>
 
@@ -147,9 +147,9 @@ export function NotificationsPage() {
                   </div>
                   <span className="metric-value">{totals.unread}</span>
                 </div>
-                <h3 className="module-title">Unread</h3>
+                <h3 className="module-title">{t("Unread")}</h3>
                 <p className="module-copy">
-                  Notifications still waiting to be read.
+                  {t("Notifications still waiting to be read.")}
                 </p>
               </article>
 
@@ -166,9 +166,9 @@ export function NotificationsPage() {
                   </div>
                   <span className="metric-value">{totals.pending}</span>
                 </div>
-                <h3 className="module-title">Pending delivery</h3>
+                <h3 className="module-title">{t("Pending delivery")}</h3>
                 <p className="module-copy">
-                  Notifications waiting for email delivery processing.
+                  {t("Notifications waiting for email delivery processing.")}
                 </p>
               </article>
 
@@ -183,9 +183,9 @@ export function NotificationsPage() {
                   </div>
                   <span className="metric-value">{totals.failed}</span>
                 </div>
-                <h3 className="module-title">Failed delivery</h3>
+                <h3 className="module-title">{t("Failed delivery")}</h3>
                 <p className="module-copy">
-                  Notifications that could not be delivered by email.
+                  {t("Notifications that could not be delivered by email.")}
                 </p>
               </article>
             </div>
@@ -196,31 +196,31 @@ export function NotificationsPage() {
             aria-labelledby="notifications-table-heading"
           >
             <h2 id="notifications-table-heading" className="section-heading">
-              Notification list
+              {t("Notification list")}
             </h2>
             <p className="section-subtitle">
-              Type, message, delivery status, and read state.
+              {t("Type, message, delivery status, and read state.")}
             </p>
 
             {notifications.length === 0 ? (
               <div className="empty-panel">
                 <CheckCircle2 size={18} />
-                <span>No platform notifications found.</span>
+                <span>{t("No platform notifications found.")}</span>
               </div>
             ) : (
               <div className="table-shell">
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th>Notification</th>
-                      <th>Recipient</th>
-                      <th>Type</th>
-                      <th>Order</th>
-                      <th>Read</th>
-                      <th>Delivery</th>
-                      <th>Attempts</th>
-                      <th>Created</th>
-                      <th>Delivered</th>
+                      <th>{t("Notification")}</th>
+                      <th>{t("Recipient")}</th>
+                      <th>{t("Type")}</th>
+                      <th>{t("Order")}</th>
+                      <th>{t("Read")}</th>
+                      <th>{t("Delivery")}</th>
+                      <th>{t("Attempts")}</th>
+                      <th>{t("Created")}</th>
+                      <th>{t("Delivered")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -236,21 +236,21 @@ export function NotificationsPage() {
                         <td>
                             <strong>{notification.recipient_username}</strong>
                             <span className="table-secondary-text">
-                              Recipient ID {notification.recipient}
+                              {t("Recipient ID")} {notification.recipient}
                             </span>
                           </td>
-                        <td>{formatLabel(notification.notification_type)}</td>
+                        <td>{t(formatLabel(notification.notification_type))}</td>
                         <td>
                           <span className="mono-cell">
                             {getOrderId(notification).slice(0, 8)}
                           </span>
                         </td>
-                        <td>{notification.is_read ? "Yes" : "No"}</td>
+                        <td>{t(notification.is_read ? "Yes" : "No")}</td>
                         <td>
                           <span
                             className={`status-badge status-${notification.delivery_status}`}
                           >
-                            {formatLabel(notification.delivery_status)}
+                            {t(formatLabel(notification.delivery_status))}
                           </span>
                         </td>
                         <td>{notification.delivery_attempts}</td>

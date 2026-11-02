@@ -1,0 +1,101 @@
+/* Readable type scale shared by every admin page. Keep this file last in index.css. */
+body {
+  font-size: 15px;
+  line-height: 1.55;
+  color: #172b46;
+}
+
+.page-title {
+  font-size: clamp(1.85rem, 3vw, 2.2rem);
+  line-height: 1.2;
+  letter-spacing: -0.035em;
+  font-weight: 750;
+  color: #10284a;
+}
+
+.page-description {
+  color: #536985;
+  font-size: 0.94rem;
+  line-height: 1.65;
+}
+
+.eyebrow {
+  color: #155bd1;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.section-heading { font-size: 1rem; font-weight: 750; }
+.section-subtitle { color: #5f718a; font-size: 0.84rem; line-height: 1.55; }
+.module-title { font-size: 0.94rem; font-weight: 750; }
+.module-copy { color: #5f718a; font-size: 0.82rem; line-height: 1.55; }
+.scope-note { color: #536985; font-size: 0.84rem; }
+
+.sidebar .nav-link { font-size: 0.9rem; font-weight: 650; }
+.sidebar .nav-section { font-size: 0.72rem; }
+.sidebar .brand-caption { font-size: 0.65rem; }
+.sidebar .sidebar-foot { font-size: 0.82rem; }
+.topbar .topbar-kicker { font-size: 0.75rem; }
+.topbar .topbar-title { font-size: 1.12rem; }
+.topbar .user-name { font-size: 0.88rem; }
+.topbar .user-role { font-size: 0.76rem; }
+.topbar .logout-button { font-size: 0.82rem; }
+.locale-switch, .login-locale-switch { min-height: 2.65rem; font-size: 0.88rem; font-weight: 700; }
+
+.data-table th {
+  color: #435873;
+  font-size: 0.76rem;
+  font-weight: 750;
+  letter-spacing: 0.025em;
+}
+.data-table td { color: #1b3557; font-size: 0.86rem; line-height: 1.5; }
+.table-secondary-text { color: #596d87; font-size: 0.78rem; }
+.mono-cell { font-size: 0.8rem; }
+.status-badge, .state-pill { font-size: 0.76rem; font-weight: 700; }
+.icon-text-button, .primary-action-button, .secondary-button, .table-action-link {
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+.field label, .product-form-field > span { font-size: 0.86rem; font-weight: 700; }
+.field input, .product-form-field input, .product-form-field select,
+.product-form-field textarea { font-size: 0.92rem; }
+.empty-panel, .products-empty-state, .people-empty { color: #536985; font-size: 0.88rem; }
+
+html[data-locale="ar"] body {
+  font-family: Tahoma, "Noto Sans Arabic", Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.75;
+  color: #172b46;
+}
+
+html[data-locale="ar"] .page-title {
+  letter-spacing: 0;
+  line-height: 1.45;
+  font-weight: 700;
+}
+
+html[data-locale="ar"] .eyebrow,
+html[data-locale="ar"] .topbar-kicker,
+html[data-locale="ar"] .sidebar .nav-section {
+  font-family: inherit;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+html[data-locale="ar"] .data-table th,
+html[data-locale="ar"] .data-table td,
+html[data-locale="ar"] .status-badge,
+html[data-locale="ar"] .state-pill,
+html[data-locale="ar"] .sidebar .nav-link {
+  letter-spacing: 0;
+}
+
+@media (max-width: 700px) {
+  body { font-size: 14px; }
+  .page-title { font-size: 1.75rem; }
+  .page-description { font-size: 0.9rem; }
+  .data-table th { font-size: 0.74rem; }
+  .data-table td { font-size: 0.82rem; }
+  html[data-locale="ar"] body { font-size: 15px; }
+}

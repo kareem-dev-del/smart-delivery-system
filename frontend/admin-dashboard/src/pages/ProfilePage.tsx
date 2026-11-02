@@ -12,6 +12,7 @@ import {
 import { ApiRequestError } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
 import { formatLabel } from "../lib/format";
+import { useLocale } from "../i18n/LocaleProvider";
 import "../styles/profile.css";
 
 const EMPTY_PROFILE: AccountProfileInput = {
@@ -38,6 +39,7 @@ function errorMessage(error: unknown): string {
 }
 
 export function ProfilePage() {
+  const { t } = useLocale();
   const { tokens, updateUser, replaceSession } = useAuth();
   const [profile, setProfile] = useState<AccountProfile | null>(null);
   const [profileForm, setProfileForm] = useState(EMPTY_PROFILE);
@@ -128,45 +130,45 @@ export function ProfilePage() {
     <>
       <div className="dashboard-intro">
         <div>
-          <p className="eyebrow">Account / Security</p>
-          <h1 className="page-title">My profile</h1>
-          <p className="page-description">Manage your administrator details and sign-in security.</p>
+          <p className="eyebrow">{t("Account / Security")}</p>
+          <h1 className="page-title">{t("My profile")}</h1>
+          <p className="page-description">{t("Manage your administrator details and sign-in security.")}</p>
         </div>
       </div>
 
       {error && <div className="scope-note error-note" role="alert"><AlertTriangle size={15} /><span>{error}</span></div>}
       {notice && <div className="products-notice" role="status"><Check size={15} /><span>{notice}</span></div>}
 
-      {loading ? <div className="people-empty">Loading profile...</div> : profile && (
+      {loading ? <div className="people-empty">{t("Loading profile...")}</div> : profile && (
         <div className="profile-layout">
           <section className="profile-panel" aria-labelledby="profile-details-heading">
             <div className="profile-panel-heading">
               <span className="profile-panel-icon"><UserRound size={18} /></span>
-              <div><h2 id="profile-details-heading">Profile details</h2><p>Update the contact information shown in your workspace.</p></div>
+              <div><h2 id="profile-details-heading">{t("Profile details")}</h2><p>{t("Update the contact information shown in your workspace.")}</p></div>
             </div>
             <div className="profile-account-identity">
-              <span>Username</span><strong>{profile.username}</strong>
-              <span>Access level</span><strong className="profile-role"><ShieldCheck size={14} />{formatLabel(profile.role)}</strong>
+              <span>{t("Username")}</span><strong>{profile.username}</strong>
+              <span>{t("Access level")}</span><strong className="profile-role"><ShieldCheck size={14} />{t(formatLabel(profile.role))}</strong>
             </div>
             <form className="profile-form" onSubmit={handleProfileSave}>
-              <label className="product-form-field"><span>First name</span><input autoComplete="given-name" maxLength={150} value={profileForm.first_name} onChange={(event) => setProfileForm({ ...profileForm, first_name: event.target.value })} /></label>
-              <label className="product-form-field"><span>Last name</span><input autoComplete="family-name" maxLength={150} value={profileForm.last_name} onChange={(event) => setProfileForm({ ...profileForm, last_name: event.target.value })} /></label>
-              <label className="product-form-field"><span>Email</span><input type="email" autoComplete="email" value={profileForm.email} onChange={(event) => setProfileForm({ ...profileForm, email: event.target.value })} /></label>
-              <label className="product-form-field"><span>Phone</span><input type="tel" autoComplete="tel" maxLength={20} value={profileForm.phone} onChange={(event) => setProfileForm({ ...profileForm, phone: event.target.value })} /></label>
-              <div className="profile-form-actions"><button className="primary-action-button" type="submit" disabled={savingProfile}><Save size={15} />{savingProfile ? "Saving..." : "Save profile"}</button></div>
+              <label className="product-form-field"><span>{t("First name")}</span><input autoComplete="given-name" maxLength={150} value={profileForm.first_name} onChange={(event) => setProfileForm({ ...profileForm, first_name: event.target.value })} /></label>
+              <label className="product-form-field"><span>{t("Last name")}</span><input autoComplete="family-name" maxLength={150} value={profileForm.last_name} onChange={(event) => setProfileForm({ ...profileForm, last_name: event.target.value })} /></label>
+              <label className="product-form-field"><span>{t("Email")}</span><input type="email" autoComplete="email" value={profileForm.email} onChange={(event) => setProfileForm({ ...profileForm, email: event.target.value })} /></label>
+              <label className="product-form-field"><span>{t("Phone")}</span><input type="tel" autoComplete="tel" maxLength={20} value={profileForm.phone} onChange={(event) => setProfileForm({ ...profileForm, phone: event.target.value })} /></label>
+              <div className="profile-form-actions"><button className="primary-action-button" type="submit" disabled={savingProfile}><Save size={15} />{t(savingProfile ? "Saving..." : "Save profile")}</button></div>
             </form>
           </section>
 
           <section className="profile-panel" aria-labelledby="profile-password-heading">
             <div className="profile-panel-heading">
               <span className="profile-panel-icon profile-security-icon"><KeyRound size={18} /></span>
-              <div><h2 id="profile-password-heading">Change password</h2><p>Confirm your current password before choosing a new one.</p></div>
+              <div><h2 id="profile-password-heading">{t("Change password")}</h2><p>{t("Confirm your current password before choosing a new one.")}</p></div>
             </div>
             <form className="profile-password-form" onSubmit={handlePasswordChange}>
-              <label className="product-form-field"><span>Current password</span><input required type="password" autoComplete="current-password" value={passwordForm.current_password} onChange={(event) => setPasswordForm({ ...passwordForm, current_password: event.target.value })} /></label>
-              <label className="product-form-field"><span>New password</span><input required type="password" autoComplete="new-password" value={passwordForm.new_password} onChange={(event) => setPasswordForm({ ...passwordForm, new_password: event.target.value })} /></label>
-              <label className="product-form-field"><span>Confirm new password</span><input required type="password" autoComplete="new-password" value={passwordForm.new_password_confirm} onChange={(event) => setPasswordForm({ ...passwordForm, new_password_confirm: event.target.value })} /></label>
-              <div className="profile-form-actions"><button className="primary-action-button" type="submit" disabled={savingPassword}><KeyRound size={15} />{savingPassword ? "Updating..." : "Update password"}</button></div>
+              <label className="product-form-field"><span>{t("Current password")}</span><input required type="password" autoComplete="current-password" value={passwordForm.current_password} onChange={(event) => setPasswordForm({ ...passwordForm, current_password: event.target.value })} /></label>
+              <label className="product-form-field"><span>{t("New password")}</span><input required type="password" autoComplete="new-password" value={passwordForm.new_password} onChange={(event) => setPasswordForm({ ...passwordForm, new_password: event.target.value })} /></label>
+              <label className="product-form-field"><span>{t("Confirm new password")}</span><input required type="password" autoComplete="new-password" value={passwordForm.new_password_confirm} onChange={(event) => setPasswordForm({ ...passwordForm, new_password_confirm: event.target.value })} /></label>
+              <div className="profile-form-actions"><button className="primary-action-button" type="submit" disabled={savingPassword}><KeyRound size={15} />{t(savingPassword ? "Updating..." : "Update password")}</button></div>
             </form>
           </section>
         </div>

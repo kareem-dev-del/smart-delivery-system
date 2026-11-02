@@ -16,6 +16,7 @@ import { ProductsPage } from './pages/ProductsPage';
 import { PeoplePage } from './pages/PeoplePage';
 import { CategoriesPage } from './pages/CategoriesPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { LocaleProvider } from './i18n/LocaleProvider';
 
 function IndexRedirect() {
   const { user, isAdmin, ready } = useAuth();
@@ -25,6 +26,7 @@ function IndexRedirect() {
 
 function App() {
   return (
+    <LocaleProvider>
     <AuthProvider>
       <BrowserRouter>
         <Routes>
@@ -52,6 +54,7 @@ function App() {
         </Routes>
       </BrowserRouter>
     </AuthProvider>
+    </LocaleProvider>
   );
 }
 

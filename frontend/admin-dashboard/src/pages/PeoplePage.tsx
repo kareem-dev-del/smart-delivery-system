@@ -14,6 +14,7 @@ import {
 import {
   createManagedAccount,
   getManagedAccounts,
+  updateCourierShift,
   updateManagedAccountStatus,
   type ManagedAccount,
   type ManagedAccountInput,
@@ -22,6 +23,8 @@ import {
 import { ApiRequestError } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
 import { formatDate, formatLabel } from "../lib/format";
+import { useLocale } from "../i18n/LocaleProvider";
+import { StyledSelect } from "../components/StyledSelect";
 
 type RoleFilter = "all" | ManagedAccountRole;
 
@@ -52,11 +55,13 @@ function displayName(account: ManagedAccount): string {
 }
 
 export function PeoplePage() {
+  const { t, locale } = useLocale();
   const { tokens, user } = useAuth();
   const [accounts, setAccounts] = useState<ManagedAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
+  const [updatingShiftId, setUpdatingShiftId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -121,7 +126,7 @@ export function PeoplePage() {
       setSearch("");
       setForm(EMPTY_FORM);
       setFormOpen(false);
-      setNotice(`${formatLabel(created.role)} account created for ${created.username}.`);
+      setNotice(locale === "ar" ? `تم إنشاء حساب ${t(formatLabel(created.role))} للمستخدم ${created.username}.` : `${formatLabel(created.role)} account created for ${created.username}.`);
     } catch (caughtError) {
       setError(getErrorMessage(caughtError));
     } finally {
@@ -140,7 +145,7 @@ export function PeoplePage() {
     try {
       const updated = await updateManagedAccountStatus(tokens.access, account.id, nextActive);
       setAccounts((current) => current.map((item) => item.id === updated.id ? updated : item));
-      setNotice(`${updated.username} is now ${updated.is_active ? "active" : "inactive"}.`);
+      setNotice(locale === "ar" ? `${updated.username} ${updated.is_active ? "نشط الآن." : "غير نشط الآن."}` : `${updated.username} is now ${updated.is_active ? "active" : "inactive"}.`);
     } catch (caughtError) {
       setError(getErrorMessage(caughtError));
     } finally {
@@ -148,89 +153,106 @@ export function PeoplePage() {
     }
   }
 
+  async function handleShiftChange(account: ManagedAccount) {
+    if (!tokens?.access || account.role !== "courier") return;
+    setUpdatingShiftId(account.id);
+    setError(null);
+    setNotice(null);
+    try {
+      const updated = await updateCourierShift(tokens.access, account.id, !account.is_on_shift);
+      setAccounts((current) => current.map((item) => item.id === updated.id ? updated : item));
+      setNotice(locale === "ar" ? `${updated.username} ${updated.is_on_shift ? "بدأ الوردية الآن" : "أنهى الوردية الآن"}.` : `${updated.username} is now ${updated.is_on_shift ? "on shift" : "off shift"}.`);
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError));
+    } finally {
+      setUpdatingShiftId(null);
+    }
+  }
+
   return (
     <div className="people-workspace">
       <div className="dashboard-intro">
         <div>
-          <p className="eyebrow">Network control / People</p>
-          <h1 className="page-title">People &amp; access</h1>
-          <p className="page-description">Create customer, courier, and trusted admin accounts, and manage their access.</p>
+          <p className="eyebrow">{t("Network control / People")}</p>
+          <h1 className="page-title">{t("People & access")}</h1>
+          <p className="page-description">{t("Create customer, courier, and trusted admin accounts, and manage their access.")}</p>
         </div>
         <div className="products-page-actions">
           <button className="icon-text-button" type="button" onClick={() => void loadAccounts()} disabled={loading}>
-            <RefreshCw size={15} /> Refresh
+            <RefreshCw size={15} /> {t("Refresh")}
           </button>
           <button className="primary-action-button" type="button" onClick={() => { setFormOpen((open) => !open); setError(null); setNotice(null); }}>
-            <CirclePlus size={15} /> {formOpen ? "Close form" : "Add account"}
+            <CirclePlus size={15} /> {t(formOpen ? "Close form" : "Add account")}
           </button>
         </div>
       </div>
 
       {error && <div className="scope-note error-note" role="alert"><AlertTriangle size={15} /><span>{error}</span></div>}
-      {notice && <div className="products-notice" role="status"><Check size={15} /><span>{notice}</span></div>}
+      {notice && <div className="products-notice" role="status"><Check size={15} /><span>{t(notice)}</span></div>}
 
-      <section className="people-summary" aria-label="Account summary">
-        <article><span>Total accounts</span><strong>{summary.total}</strong></article>
-        <article><span>Customers</span><strong>{summary.customers}</strong></article>
-        <article><span>Couriers</span><strong>{summary.couriers}</strong></article>
-        <article><span>Admins</span><strong>{summary.admins}</strong></article>
-        <article className={summary.inactive ? "people-summary-warning" : ""}><span>Inactive</span><strong>{summary.inactive}</strong></article>
+      <section className="people-summary" aria-label={t("Account summary")}>
+        <article><span>{t("Total accounts")}</span><strong>{summary.total}</strong></article>
+        <article><span>{t("Customers")}</span><strong>{summary.customers}</strong></article>
+        <article><span>{t("Couriers")}</span><strong>{summary.couriers}</strong></article>
+        <article><span>{t("Admins")}</span><strong>{summary.admins}</strong></article>
+        <article className={summary.inactive ? "people-summary-warning" : ""}><span>{t("Inactive")}</span><strong>{summary.inactive}</strong></article>
       </section>
 
       {formOpen && (
         <section className="people-form-panel" aria-labelledby="people-form-heading">
           <div className="product-form-heading">
-            <div><p className="eyebrow">Account administration</p><h2 id="people-form-heading">Create account</h2></div>
+            <div><p className="eyebrow">{t("Account administration")}</p><h2 id="people-form-heading">{t("Create account")}</h2></div>
           </div>
           <form className="people-form" onSubmit={handleCreate}>
-            <label className="product-form-field"><span>Account type</span><select value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value as ManagedAccountRole })}><option value="customer">Customer</option><option value="courier">Courier</option><option value="admin">Admin</option></select></label>
-            <label className="product-form-field"><span>Username</span><input required minLength={3} maxLength={150} autoComplete="off" value={form.username} onChange={(event) => setForm({ ...form, username: event.target.value })} /></label>
-            <label className="product-form-field"><span>Phone</span><input required type="tel" maxLength={20} autoComplete="tel" placeholder="+2010..." value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} /></label>
-            <label className="product-form-field"><span>First name</span><input maxLength={150} autoComplete="given-name" value={form.first_name} onChange={(event) => setForm({ ...form, first_name: event.target.value })} /></label>
-            <label className="product-form-field"><span>Last name</span><input maxLength={150} autoComplete="family-name" value={form.last_name} onChange={(event) => setForm({ ...form, last_name: event.target.value })} /></label>
-            <label className="product-form-field"><span>Email</span><input type="email" autoComplete="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></label>
-            <label className="product-form-field"><span>Initial password</span><input required type="password" autoComplete="new-password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} /></label>
-            <label className="product-form-field"><span>Confirm password</span><input required type="password" autoComplete="new-password" value={form.password_confirm} onChange={(event) => setForm({ ...form, password_confirm: event.target.value })} /></label>
-            <div className="people-form-foot"><span>Admin accounts have full dashboard access. Create them only for trusted operators. Passwords are never returned after creation.</span><button className="primary-action-button" type="submit" disabled={saving}><UserRoundPlus size={15} />{saving ? "Creating..." : "Create account"}</button></div>
+            <label className="product-form-field"><span>{t("Account type")}</span><StyledSelect ariaLabel={t("Account type")} value={form.role} onChange={(value) => setForm({ ...form, role: value as ManagedAccountRole })} options={[{ value: "customer", label: t("Customer") }, { value: "courier", label: t("Courier") }, { value: "admin", label: t("Admin") }]} /></label>
+            <label className="product-form-field"><span>{t("Username")}</span><input required minLength={3} maxLength={150} autoComplete="off" value={form.username} onChange={(event) => setForm({ ...form, username: event.target.value })} /></label>
+            <label className="product-form-field"><span>{t("Phone")}</span><input required type="tel" maxLength={20} autoComplete="tel" placeholder="+2010..." value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} /></label>
+            <label className="product-form-field"><span>{t("First name")}</span><input maxLength={150} autoComplete="given-name" value={form.first_name} onChange={(event) => setForm({ ...form, first_name: event.target.value })} /></label>
+            <label className="product-form-field"><span>{t("Last name")}</span><input maxLength={150} autoComplete="family-name" value={form.last_name} onChange={(event) => setForm({ ...form, last_name: event.target.value })} /></label>
+            <label className="product-form-field"><span>{t("Email")}</span><input type="email" autoComplete="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></label>
+            <label className="product-form-field"><span>{t("Initial password")}</span><input required type="password" autoComplete="new-password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} /></label>
+            <label className="product-form-field"><span>{t("Confirm password")}</span><input required type="password" autoComplete="new-password" value={form.password_confirm} onChange={(event) => setForm({ ...form, password_confirm: event.target.value })} /></label>
+            <div className="people-form-foot"><span>{t("Admin accounts have full dashboard access. Create them only for trusted operators. Passwords are never returned after creation.")}</span><button className="primary-action-button" type="submit" disabled={saving}><UserRoundPlus size={15} />{t(saving ? "Creating..." : "Create account")}</button></div>
           </form>
         </section>
       )}
 
       <section className="people-directory-panel" aria-labelledby="people-directory-heading">
         <div className="people-directory-heading">
-          <div><h2 id="people-directory-heading">Account directory</h2><p>{loading ? "Loading accounts..." : `${visibleAccounts.length} of ${accounts.length} accounts`}</p></div>
-          <label className="people-search"><Search size={15} /><input aria-label="Search accounts" placeholder="Search name, username, email, phone" value={search} onChange={(event) => setSearch(event.target.value)} /></label>
+          <div><h2 id="people-directory-heading">{t("Account directory")}</h2><p>{loading ? t("Loading accounts...") : locale === "ar" ? `${visibleAccounts.length} من ${accounts.length} حساب` : `${visibleAccounts.length} of ${accounts.length} accounts`}</p></div>
+          <label className="people-search"><Search size={15} /><input aria-label={t("Search accounts")} placeholder={t("Search name, username, email, phone")} value={search} onChange={(event) => setSearch(event.target.value)} /></label>
         </div>
 
-        <div className="people-filters" role="group" aria-label="Filter accounts by role">
+        <div className="people-filters" role="group" aria-label={t("Filter accounts by role")}>
           {(["all", "customer", "courier", "admin"] as const).map((role) => (
             <button key={role} type="button" className={roleFilter === role ? "active" : ""} onClick={() => setRoleFilter(role)}>
-              {role === "all" ? "All accounts" : role === "customer" ? "Customers" : role === "courier" ? "Couriers" : "Admins"}
+              {t(role === "all" ? "All accounts" : role === "customer" ? "Customers" : role === "courier" ? "Couriers" : "Admins")}
             </button>
           ))}
         </div>
 
-        {loading ? <div className="people-empty"><UsersRound size={19} />Loading accounts...</div> : visibleAccounts.length === 0 ? (
-          <div className="people-empty"><UserRound size={19} /><strong>No accounts found</strong><span>Try another search or create an account.</span></div>
+        {loading ? <div className="people-empty"><UsersRound size={19} />{t("Loading accounts...")}</div> : visibleAccounts.length === 0 ? (
+          <div className="people-empty"><UserRound size={19} /><strong>{t("No accounts found")}</strong><span>{t("Try another search or create an account.")}</span></div>
         ) : (
           <div className="table-shell">
             <table className="data-table people-table">
-              <thead><tr><th>Account</th><th>Role</th><th>Phone</th><th>Email</th><th>Status</th><th>Action</th></tr></thead>
+              <thead><tr><th>{t("Account")}</th><th>{t("Role")}</th><th>{t("Phone")}</th><th>{t("Email")}</th><th>{t("Access")}</th><th>{t("Dispatch")}</th><th>{t("Actions")}</th></tr></thead>
               <tbody>{visibleAccounts.map((account) => (
                 <tr key={account.id}>
                   <td><div className="people-name-cell"><span className={`people-avatar people-avatar-${account.role}`}>{account.role === "courier" ? <UserRoundPlus size={16} /> : account.role === "admin" ? <ShieldCheck size={16} /> : <UserRound size={16} />}</span><span><strong>{displayName(account)}</strong><small>@{account.username}</small></span></div></td>
-                  <td><span className={`people-role people-role-${account.role}`}>{formatLabel(account.role)}</span></td>
+                  <td><span className={`people-role people-role-${account.role}`}>{t(formatLabel(account.role))}</span></td>
                   <td>{account.phone || "-"}</td>
                   <td>{account.email || "-"}</td>
-                  <td><span className={`people-status ${account.is_active ? "is-active" : "is-inactive"}`}><span />{account.is_active ? "Active" : "Inactive"}</span></td>
-                  <td>{account.role === "admin" && account.username === user?.username ? <span className="people-current-account">Current account</span> : <button className={`people-status-action ${account.is_active ? "deactivate" : "activate"}`} type="button" disabled={updatingId === account.id} onClick={() => void handleStatusChange(account)}>{updatingId === account.id ? "Saving..." : account.is_active ? "Deactivate" : "Reactivate"}</button>}</td>
+                  <td><span className={`people-status ${account.is_active ? "is-active" : "is-inactive"}`}><span />{t(account.is_active ? "Active" : "Inactive")}</span></td>
+                  <td>{account.role === "courier" ? <span className={`people-dispatch-state dispatch-${account.dispatch_status}`}><span />{t(formatLabel(account.dispatch_status))}{account.active_order_count > 0 ? ` · ${account.active_order_count} ${t("active orders")}` : ""}</span> : "-"}</td>
+                  <td><div className="people-actions-cell">{account.role === "courier" && <button className={`people-status-action ${account.is_on_shift ? "deactivate" : "activate"}`} type="button" title={account.active_order_count > 0 && account.is_on_shift ? t("Reassign active orders before ending this shift.") : undefined} disabled={!account.is_active || updatingShiftId === account.id || (account.is_on_shift && account.active_order_count > 0)} onClick={() => void handleShiftChange(account)}>{t(updatingShiftId === account.id ? "Saving..." : account.is_on_shift ? "End shift" : "Start shift")}</button>}{account.role === "admin" && account.username === user?.username ? <span className="people-current-account">{t("Current account")}</span> : <button className={`people-status-action ${account.is_active ? "deactivate" : "activate"}`} type="button" disabled={updatingId === account.id} onClick={() => void handleStatusChange(account)}>{t(updatingId === account.id ? "Saving..." : account.is_active ? "Deactivate" : "Reactivate")}</button>}</div></td>
                 </tr>
               ))}</tbody>
             </table>
           </div>
         )}
       </section>
-      <p className="people-retention-note">Deactivated accounts cannot sign in. Their order history and audit records remain available.</p>
+      <p className="people-retention-note">{t("Deactivated accounts cannot sign in. Their order history and audit records remain available.")}</p>
     </div>
   );
 }

@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { formatDate, formatLabel } from "../lib/format";
+import { useLocale } from "../i18n/LocaleProvider";
+import { StyledSelect } from "../components/StyledSelect";
 
 import {
   AlertTriangle,
@@ -34,6 +36,7 @@ import {
   type LockerStationDetail,
   type LockerStationInput,
 } from "../api/lockers";
+import { ApiRequestError } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
 
 const EMPTY_STATION_FORM: LockerStationInput = {
@@ -45,7 +48,19 @@ const EMPTY_STATION_FORM: LockerStationInput = {
   status: "offline",
 };
 
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof ApiRequestError && error.details && typeof error.details === "object") {
+    const messages = Object.entries(error.details as Record<string, unknown>).flatMap(([field, value]) => {
+      const values = Array.isArray(value) ? value : [value];
+      return values.map((item) => `${formatLabel(field)}: ${String(item)}`);
+    });
+    if (messages.length) return messages.join(" ");
+  }
+  return error instanceof Error ? error.message : fallback;
+}
+
 export function LockersPage() {
+  const { t } = useLocale();
   const { tokens } = useAuth();
   const [stations, setStations] = useState<LockerStation[]>([]);
   const [devices, setDevices] = useState<LockerDevice[]>([]);
@@ -143,7 +158,7 @@ export function LockersPage() {
       setStationFormOpen(false);
       await loadLockers();
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Could not save the locker station.");
+      setError(getErrorMessage(caughtError, "Could not save the locker station."));
     } finally {
       setSaving(false);
     }
@@ -160,7 +175,7 @@ export function LockersPage() {
       setDrawerStationId(null);
       await loadLockers();
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Could not add the drawer.");
+      setError(getErrorMessage(caughtError, "Could not add the drawer."));
     } finally {
       setSaving(false);
     }
@@ -327,19 +342,19 @@ export function LockersPage() {
     <>
       <div className="dashboard-intro">
         <div>
-          <p className="eyebrow">Network control / Lockers</p>
-          <h1 className="page-title">Lockers</h1>
+          <p className="eyebrow">{t("Network control / Lockers")}</p>
+          <h1 className="page-title">{t("Lockers")}</h1>
           <p className="page-description">
-            Live locker stations and device status from the SmartDrop backend.
+            {t("Live locker stations and device status from the SmartDrop backend.")}
           </p>
         </div>
 
         <div className="products-page-actions">
           <button className="icon-text-button" type="button" onClick={() => void loadLockers()}>
-            <RefreshCw size={16} /> Refresh
+            <RefreshCw size={16} /> {t("Refresh")}
           </button>
           <button className="primary-action-button" type="button" onClick={openNewStationForm}>
-            <CirclePlus size={16} /> Add station
+            <CirclePlus size={16} /> {t("Add station")}
           </button>
         </div>
       </div>
@@ -347,7 +362,7 @@ export function LockersPage() {
       {loading && (
         <div className="scope-note">
           <Boxes size={15} />
-          <span>Loading lockers...</span>
+          <span>{t("Loading lockers...")}</span>
         </div>
       )}
 
@@ -360,54 +375,54 @@ export function LockersPage() {
 
       {notice && (
         <div className="products-notice" role="status">
-          <ShieldCheck size={16} /><span>{notice}</span>
+          <ShieldCheck size={16} /><span>{t(notice)}</span>
         </div>
       )}
 
       {stationFormOpen && (
         <section className="locker-admin-form-panel" aria-labelledby="station-form-heading">
           <div className="product-form-heading">
-            <div><p className="eyebrow">Network configuration</p><h2 id="station-form-heading">{editingStationId === null ? "Add locker station" : "Edit locker station"}</h2></div>
-            <button className="icon-button" type="button" aria-label="Close station form" onClick={() => setStationFormOpen(false)}><X size={17} /></button>
+            <div><p className="eyebrow">{t("Network configuration")}</p><h2 id="station-form-heading">{t(editingStationId === null ? "Add locker station" : "Edit locker station")}</h2></div>
+            <button className="icon-button" type="button" aria-label={t("Close station form")} onClick={() => setStationFormOpen(false)}><X size={17} /></button>
           </div>
           <form className="product-form" onSubmit={handleStationSubmit}>
-            <label className="product-form-field"><span>Station name</span><input required maxLength={255} value={stationForm.name} onChange={(event) => setStationForm({ ...stationForm, name: event.target.value })} /></label>
-            <label className="product-form-field"><span>Station code</span><input required maxLength={50} value={stationForm.code} onChange={(event) => setStationForm({ ...stationForm, code: event.target.value.toUpperCase() })} /></label>
-            <label className="product-form-field"><span>Status</span><select value={stationForm.status} onChange={(event) => setStationForm({ ...stationForm, status: event.target.value as LockerStationInput["status"] })}><option value="online">Online</option><option value="offline">Offline</option><option value="maintenance">Maintenance</option></select></label>
-            <label className="product-form-field product-form-description"><span>Address</span><textarea required rows={2} value={stationForm.address} onChange={(event) => setStationForm({ ...stationForm, address: event.target.value })} /></label>
-            <label className="product-form-field"><span>Latitude</span><input required type="number" step="0.000001" min="-90" max="90" value={stationForm.latitude} onChange={(event) => setStationForm({ ...stationForm, latitude: event.target.value })} /></label>
-            <label className="product-form-field"><span>Longitude</span><input required type="number" step="0.000001" min="-180" max="180" value={stationForm.longitude} onChange={(event) => setStationForm({ ...stationForm, longitude: event.target.value })} /></label>
-            <div className="product-form-actions"><button className="icon-text-button" type="button" onClick={() => setStationFormOpen(false)} disabled={saving}>Cancel</button><button className="primary-action-button" type="submit" disabled={saving}><Save size={15} />{saving ? "Saving..." : editingStationId === null ? "Create station" : "Save changes"}</button></div>
+            <label className="product-form-field"><span>{t("Station name")}</span><input required maxLength={255} value={stationForm.name} onChange={(event) => setStationForm({ ...stationForm, name: event.target.value })} /></label>
+            <label className="product-form-field"><span>{t("Station code")}</span><input required maxLength={50} value={stationForm.code} onChange={(event) => setStationForm({ ...stationForm, code: event.target.value.toUpperCase() })} /></label>
+            <label className="product-form-field"><span>{t("Status")}</span><StyledSelect ariaLabel={t("Status")} value={stationForm.status} onChange={(value) => setStationForm({ ...stationForm, status: value as LockerStationInput["status"] })} options={[{ value: "online", label: t("Online") }, { value: "offline", label: t("Offline") }, { value: "maintenance", label: t("Maintenance") }]} /></label>
+            <label className="product-form-field product-form-description"><span>{t("Address")}</span><textarea required rows={2} value={stationForm.address} onChange={(event) => setStationForm({ ...stationForm, address: event.target.value })} /></label>
+            <label className="product-form-field"><span>{t("Latitude")}</span><input required type="number" step="0.000001" min="-90" max="90" value={stationForm.latitude} onChange={(event) => setStationForm({ ...stationForm, latitude: event.target.value })} /></label>
+            <label className="product-form-field"><span>{t("Longitude")}</span><input required type="number" step="0.000001" min="-180" max="180" value={stationForm.longitude} onChange={(event) => setStationForm({ ...stationForm, longitude: event.target.value })} /></label>
+            <div className="product-form-actions"><button className="icon-text-button" type="button" onClick={() => setStationFormOpen(false)} disabled={saving}>{t("Cancel")}</button><button className="primary-action-button" type="submit" disabled={saving}><Save size={15} />{t(saving ? "Saving..." : editingStationId === null ? "Create station" : "Save changes")}</button></div>
           </form>
         </section>
       )}
 
       {drawerStationId !== null && (
         <section className="locker-admin-form-panel" aria-labelledby="drawer-form-heading">
-          <div className="product-form-heading"><div><p className="eyebrow">Capacity management</p><h2 id="drawer-form-heading">Add drawer to {stationDetails.find((station) => station.id === drawerStationId)?.name}</h2></div><button className="icon-button" type="button" aria-label="Close drawer form" onClick={() => setDrawerStationId(null)}><X size={17} /></button></div>
+          <div className="product-form-heading"><div><p className="eyebrow">{t("Capacity management")}</p><h2 id="drawer-form-heading">{t("Add drawer to")} {stationDetails.find((station) => station.id === drawerStationId)?.name}</h2></div><button className="icon-button" type="button" aria-label={t("Close drawer form")} onClick={() => setDrawerStationId(null)}><X size={17} /></button></div>
           <form className="product-form locker-compact-form" onSubmit={handleDrawerSubmit}>
-            <label className="product-form-field"><span>Drawer number</span><input required type="number" min="1" step="1" value={drawerNumber} onChange={(event) => setDrawerNumber(Number(event.target.value))} /></label>
-            <label className="product-form-field"><span>Drawer size</span><select value={drawerSize} onChange={(event) => setDrawerSize(event.target.value as Drawer["size"])}><option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option></select></label>
-            <div className="product-form-actions"><button className="icon-text-button" type="button" onClick={() => setDrawerStationId(null)} disabled={saving}>Cancel</button><button className="primary-action-button" type="submit" disabled={saving}><Plus size={15} />{saving ? "Adding..." : "Add drawer"}</button></div>
+            <label className="product-form-field"><span>{t("Drawer number")}</span><input required type="number" min="1" step="1" value={drawerNumber} onChange={(event) => setDrawerNumber(Number(event.target.value))} /></label>
+            <label className="product-form-field"><span>{t("Drawer size")}</span><StyledSelect ariaLabel={t("Drawer size")} value={drawerSize} onChange={(value) => setDrawerSize(value as Drawer["size"])} options={[{ value: "small", label: t("Small") }, { value: "medium", label: t("Medium") }, { value: "large", label: t("Large") }]} /></label>
+            <div className="product-form-actions"><button className="icon-text-button" type="button" onClick={() => setDrawerStationId(null)} disabled={saving}>{t("Cancel")}</button><button className="primary-action-button" type="submit" disabled={saving}><Plus size={15} />{t(saving ? "Adding..." : "Add drawer")}</button></div>
           </form>
         </section>
       )}
 
       {provisionStationId !== null && (
         <section className="locker-admin-form-panel" aria-labelledby="provision-form-heading">
-          <div className="product-form-heading"><div><p className="eyebrow">Device onboarding</p><h2 id="provision-form-heading">Provision device for {stations.find((station) => station.id === provisionStationId)?.name}</h2></div><button className="icon-button" type="button" aria-label="Close device form" onClick={() => setProvisionStationId(null)}><X size={17} /></button></div>
+          <div className="product-form-heading"><div><p className="eyebrow">{t("Device onboarding")}</p><h2 id="provision-form-heading">{t("Provision device for")} {stations.find((station) => station.id === provisionStationId)?.name}</h2></div><button className="icon-button" type="button" aria-label={t("Close device form")} onClick={() => setProvisionStationId(null)}><X size={17} /></button></div>
           <form className="product-form locker-compact-form" onSubmit={handleProvisionSubmit}>
-            <label className="product-form-field"><span>Device code</span><input required maxLength={100} value={deviceCode} onChange={(event) => setDeviceCode(event.target.value.toUpperCase())} placeholder="e.g. MAADI-DEVICE-001" /></label>
-            <div className="product-form-actions"><button className="icon-text-button" type="button" onClick={() => setProvisionStationId(null)} disabled={saving}>Cancel</button><button className="primary-action-button" type="submit" disabled={saving}><Monitor size={15} />{saving ? "Provisioning..." : "Provision device"}</button></div>
+            <label className="product-form-field"><span>{t("Device code")}</span><input required maxLength={100} value={deviceCode} onChange={(event) => setDeviceCode(event.target.value.toUpperCase())} placeholder="e.g. MAADI-DEVICE-001" /></label>
+            <div className="product-form-actions"><button className="icon-text-button" type="button" onClick={() => setProvisionStationId(null)} disabled={saving}>{t("Cancel")}</button><button className="primary-action-button" type="submit" disabled={saving}><Monitor size={15} />{t(saving ? "Provisioning..." : "Provision device")}</button></div>
           </form>
         </section>
       )}
 
       {deviceCredentials && (
         <section className="device-credentials-panel" aria-labelledby="device-credentials-heading">
-          <div><p className="eyebrow">Save these credentials</p><h2 id="device-credentials-heading">Device provisioned successfully</h2><p>The initial password is displayed once. Copy it and store it securely before closing this panel.</p></div>
-          <dl><div><dt>Device</dt><dd>{deviceCredentials.device_code}</dd></div><div><dt>Username</dt><dd>{deviceCredentials.username}</dd></div><div><dt>Initial password</dt><dd className="mono-cell">{deviceCredentials.initial_password}</dd></div></dl>
-          <div className="products-page-actions"><button className="primary-action-button" type="button" onClick={() => void copyDeviceCredentials()}><Copy size={15} />Copy credentials</button><button className="icon-text-button" type="button" onClick={() => setDeviceCredentials(null)}>Close</button></div>
+          <div><p className="eyebrow">{t("Save these credentials")}</p><h2 id="device-credentials-heading">{t("Device provisioned successfully")}</h2><p>{t("The initial password is displayed once. Copy it and store it securely before closing this panel.")}</p></div>
+          <dl><div><dt>{t("Device")}</dt><dd>{deviceCredentials.device_code}</dd></div><div><dt>{t("Username")}</dt><dd>{deviceCredentials.username}</dd></div><div><dt>{t("Initial password")}</dt><dd className="mono-cell">{deviceCredentials.initial_password}</dd></div></dl>
+          <div className="products-page-actions"><button className="primary-action-button" type="button" onClick={() => void copyDeviceCredentials()}><Copy size={15} />{t("Copy credentials")}</button><button className="icon-text-button" type="button" onClick={() => setDeviceCredentials(null)}>{t("Close")}</button></div>
         </section>
       )}
 
@@ -418,12 +433,10 @@ export function LockersPage() {
             aria-labelledby="locker-summary-heading"
           >
             <h2 id="locker-summary-heading" className="section-heading">
-              Locker summary
+              {t("Locker summary")}
             </h2>
             <p className="section-subtitle">
-              {totals.stations} station{totals.stations === 1 ? "" : "s"} and{" "}
-              {devices.length} device{devices.length === 1 ? "" : "s"} returned
-              by the API.
+              {t("Stations")}: {totals.stations} · {t("Devices")}: {devices.length}
             </p>
 
             <div className="module-grid">
@@ -434,9 +447,9 @@ export function LockersPage() {
                   </div>
                   <span className="metric-value">{totals.stations}</span>
                 </div>
-                <h3 className="module-title">Stations</h3>
+                <h3 className="module-title">{t("Stations")}</h3>
                 <p className="module-copy">
-                  Locker locations managed by SmartDrop.
+                  {t("Locker locations managed by SmartDrop.")}
                 </p>
               </article>
 
@@ -449,9 +462,9 @@ export function LockersPage() {
                     {totals.availableDrawers}
                   </span>
                 </div>
-                <h3 className="module-title">Available drawers</h3>
+                <h3 className="module-title">{t("Available drawers")}</h3>
                 <p className="module-copy">
-                  Drawers currently available for assignment.
+                  {t("Drawers currently available for assignment.")}
                 </p>
               </article>
 
@@ -462,9 +475,9 @@ export function LockersPage() {
                   </div>
                   <span className="metric-value">{totals.activeDevices}</span>
                 </div>
-                <h3 className="module-title">Active devices</h3>
+                <h3 className="module-title">{t("Active devices")}</h3>
                 <p className="module-copy">
-                  Registered locker devices marked active.
+                  {t("Registered locker devices marked active.")}
                 </p>
               </article>
 
@@ -483,9 +496,9 @@ export function LockersPage() {
                     {totals.unhealthyDevices}
                   </span>
                 </div>
-                <h3 className="module-title">Unhealthy devices</h3>
+                <h3 className="module-title">{t("Unhealthy devices")}</h3>
                 <p className="module-copy">
-                  Devices that are stale, inactive, or offline.
+                  {t("Devices that are stale, inactive, or offline.")}
                 </p>
               </article>
             </div>
@@ -499,13 +512,13 @@ export function LockersPage() {
               Locker stations
             </h2>
             <p className="section-subtitle">
-              Physical locker locations and available drawer capacity.
+              {t("Physical locker locations and available drawer capacity.")}
             </p>
 
             {stations.length === 0 ? (
               <div className="empty-panel">
                 <Boxes size={18} />
-                <span>No locker stations found.</span>
+                <span>{t("No locker stations found.")}</span>
               </div>
             ) : (
               <div className="locker-station-grid">
@@ -516,20 +529,20 @@ export function LockersPage() {
                     <article className="locker-station-card" key={station.id}>
                       <div className="locker-station-card-top">
                         <span className="locker-station-mark"><Boxes size={21} /></span>
-                        <span className={`status-badge status-${station.status}`}>{formatLabel(station.status)}</span>
+                        <span className={`status-badge status-${station.status}`}>{t(formatLabel(station.status))}</span>
                       </div>
                       <h3>{station.name}</h3>
                       <span className="mono-cell locker-station-code">{station.code}</span>
                       <p className="locker-station-address"><MapPin size={14} />{station.address}</p>
                       <div className="locker-station-facts">
-                        <div><strong>{station.available_drawers_count}</strong><span>Available drawers</span></div>
-                        <div><strong>{detail?.drawers.length ?? 0}</strong><span>Total capacity</span></div>
+                        <div><strong>{station.available_drawers_count}</strong><span>{t("Available drawers")}</span></div>
+                        <div><strong>{detail?.drawers.length ?? 0}</strong><span>{t("Total capacity")}</span></div>
                       </div>
-                      {device && <div className="locker-station-device"><Monitor size={14} /><span>{device.device_code}</span><span className={`status-badge status-${device.connection_status}`}>{formatLabel(device.connection_status)}</span></div>}
+                      {device && <div className="locker-station-device"><Monitor size={14} /><span>{device.device_code}</span><span className={`status-badge status-${device.connection_status}`}>{t(formatLabel(device.connection_status))}</span></div>}
                       <div className="locker-row-actions">
-                        <button className="product-edit-button" type="button" onClick={() => openEditStationForm(station)}><Pencil size={14} /> Edit station</button>
-                        <button className="product-edit-button" type="button" onClick={() => { if (detail) openDrawerForm(detail); }} disabled={!detail}><Plus size={14} /> Add drawer</button>
-                        {!device && <button className="product-edit-button" type="button" onClick={() => { setProvisionStationId(station.id); setDeviceCode(""); setDeviceCredentials(null); }}><Monitor size={14} /> Add device</button>}
+                        <button className="product-edit-button" type="button" onClick={() => openEditStationForm(station)}><Pencil size={14} /> {t("Edit station")}</button>
+                        <button className="product-edit-button" type="button" onClick={() => { if (detail) openDrawerForm(detail); }} disabled={!detail}><Plus size={14} /> {t("Add drawer")}</button>
+                        {!device && <button className="product-edit-button" type="button" onClick={() => { setProvisionStationId(station.id); setDeviceCode(""); setDeviceCredentials(null); }}><Monitor size={14} /> {t("Add device")}</button>}
                       </div>
                       <small className="locker-station-coordinates">{station.latitude}, {station.longitude}</small>
                     </article>
@@ -547,24 +560,24 @@ export function LockersPage() {
               Drawers
             </h2>
             <p className="section-subtitle">
-              Drawer size, status, and maintenance controls by locker station.
+              {t("Drawer size, status, and maintenance controls by locker station.")}
             </p>
 
             {stationDetails.length === 0 ? (
               <div className="empty-panel">
                 <Boxes size={18} />
-                <span>No drawers found.</span>
+                <span>{t("No drawers found.")}</span>
               </div>
             ) : (
               <div className="table-shell">
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th>Locker</th>
-                      <th>Drawer</th>
-                      <th>Size</th>
-                      <th>Status</th>
-                      <th>Action</th>
+                      <th>{t("Locker")}</th>
+                      <th>{t("Drawer")}</th>
+                      <th>{t("Size")}</th>
+                      <th>{t("Status")}</th>
+                      <th>{t("Action")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -573,12 +586,12 @@ export function LockersPage() {
                         <tr key={drawer.id}>
                           <td>{stationDetail.name}</td>
                           <td>{drawer.number}</td>
-                          <td>{formatLabel(drawer.size)}</td>
+                          <td>{t(formatLabel(drawer.size))}</td>
                           <td>
                             <span
                               className={`status-badge status-${drawer.status}`}
                             >
-                              {formatLabel(drawer.status)}
+                              {t(formatLabel(drawer.status))}
                             </span>
                           </td>
                           <td>
@@ -597,8 +610,8 @@ export function LockersPage() {
                               }
                             >
                               {drawer.status === "out_of_service"
-                                ? "Mark available"
-                                : "Mark out of service"}
+                                ? t("Mark available")
+                                : t("Mark out of service")}
                             </button>
                           </td>
                         </tr>
@@ -618,26 +631,26 @@ export function LockersPage() {
               Locker devices
             </h2>
             <p className="section-subtitle">
-              Device activation and connection status across the network.
+              {t("Device activation and connection status across the network.")}
             </p>
 
             {devices.length === 0 ? (
               <div className="empty-panel">
                 <Monitor size={18} />
-                <span>No locker devices found.</span>
+                <span>{t("No locker devices found.")}</span>
               </div>
             ) : (
               <div className="table-shell">
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th>Device</th>
-                      <th>Locker</th>
-                      <th>Active</th>
-                      <th>Action</th>
-                      <th>Connection</th>
-                      <th>Last heartbeat</th>
-                      <th>Updated</th>
+                      <th>{t("Device")}</th>
+                      <th>{t("Locker")}</th>
+                      <th>{t("Active")}</th>
+                      <th>{t("Action")}</th>
+                      <th>{t("Connection")}</th>
+                      <th>{t("Last heartbeat")}</th>
+                      <th>{t("Updated")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -657,7 +670,7 @@ export function LockersPage() {
                                 : "state-pill-inactive"
                             }`}
                           >
-                            {device.is_active ? "Active" : "Inactive"}
+                            {t(device.is_active ? "Active" : "Inactive")}
                           </span>
                         </td>
                         <td>
@@ -672,14 +685,14 @@ export function LockersPage() {
                               handleDeviceActivationToggle(device)
                             }
                           >
-                            {device.is_active ? "Deactivate" : "Activate"}
+                            {t(device.is_active ? "Deactivate" : "Activate")}
                           </button>
                         </td>
                         <td>
                           <span
                             className={`status-badge status-${device.connection_status}`}
                           >
-                            {formatLabel(device.connection_status)}
+                              {t(formatLabel(device.connection_status))}
                           </span>
                         </td>
                         <td>{formatDate(device.last_heartbeat_at)}</td>

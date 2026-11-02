@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { formatDate, formatLabel } from "../lib/format";
+import { useLocale } from "../i18n/LocaleProvider";
 import {
   AlertTriangle,
   ClipboardList,
@@ -26,6 +27,7 @@ function formatMetadata(metadata: Record<string, unknown>): string {
 }
 
 export function AuditLogPage() {
+  const { t, locale } = useLocale();
   const { tokens } = useAuth();
   const [entries, setEntries] = useState<AuditLogEntry[]>([]);
   const [count, setCount] = useState(0);
@@ -78,23 +80,21 @@ export function AuditLogPage() {
     <>
       <div className="dashboard-intro">
         <div>
-          <p className="eyebrow">Network control / Audit log</p>
-          <h1 className="page-title">Audit Log</h1>
-          <p className="page-description">
-            Administrative activity trail from the SmartDrop backend.
-          </p>
+          <p className="eyebrow">{t("Network control / Audit log")}</p>
+          <h1 className="page-title">{t("Audit Log")}</h1>
+          <p className="page-description">{t("Administrative activity trail from the SmartDrop backend.")}</p>
         </div>
 
         <button className="icon-text-button" type="button" onClick={loadAuditLog}>
           <RefreshCw size={16} />
-          Refresh
+          {t("Refresh")}
         </button>
       </div>
 
       {loading && (
         <div className="scope-note">
           <FileClock size={15} />
-          <span>Loading audit log...</span>
+          <span>{t("Loading audit log...")}</span>
         </div>
       )}
 
@@ -112,10 +112,10 @@ export function AuditLogPage() {
             aria-labelledby="audit-summary-heading"
           >
             <h2 id="audit-summary-heading" className="section-heading">
-              Audit summary
+              {t("Audit summary")}
             </h2>
             <p className="section-subtitle">
-              {count} event{count === 1 ? "" : "s"} returned by the API.
+              {locale === "ar" ? `أعاد النظام ${count} حدثًا.` : `${count} event${count === 1 ? "" : "s"} returned by the API.`}
             </p>
 
             <div className="module-grid">
@@ -126,9 +126,9 @@ export function AuditLogPage() {
                   </div>
                   <span className="metric-value">{count}</span>
                 </div>
-                <h3 className="module-title">Total events</h3>
+                <h3 className="module-title">{t("Total events")}</h3>
                 <p className="module-copy">
-                  Recorded administrative events visible to this account.
+                  {t("Recorded administrative events visible to this account.")}
                 </p>
               </article>
 
@@ -139,9 +139,9 @@ export function AuditLogPage() {
                   </div>
                   <span className="metric-value">{uniqueActors}</span>
                 </div>
-                <h3 className="module-title">Actors</h3>
+                <h3 className="module-title">{t("Actors")}</h3>
                 <p className="module-copy">
-                  Users or system actors that performed events.
+                  {t("Users or system actors that performed events.")}
                 </p>
               </article>
 
@@ -152,9 +152,9 @@ export function AuditLogPage() {
                   </div>
                   <span className="metric-value">{uniqueActions}</span>
                 </div>
-                <h3 className="module-title">Action types</h3>
+                <h3 className="module-title">{t("Action types")}</h3>
                 <p className="module-copy">
-                  Distinct event names returned by the audit API.
+                  {t("Distinct event names returned by the audit API.")}
                 </p>
               </article>
 
@@ -165,9 +165,9 @@ export function AuditLogPage() {
                   </div>
                   <span className="metric-value">{orderEvents}</span>
                 </div>
-                <h3 className="module-title">Order events</h3>
+                <h3 className="module-title">{t("Order events")}</h3>
                 <p className="module-copy">
-                  Audit events attached to order workflow operations.
+                  {t("Audit events attached to order workflow operations.")}
                 </p>
               </article>
             </div>
@@ -175,27 +175,27 @@ export function AuditLogPage() {
 
           <section className="orders-table-panel" aria-labelledby="audit-table-heading">
             <h2 id="audit-table-heading" className="section-heading">
-              Event list
+              {t("Event list")}
             </h2>
             <p className="section-subtitle">
-              Actor, action, target, metadata, and timestamp.
+              {t("Actor, action, target, metadata, and timestamp.")}
             </p>
 
             {entries.length === 0 ? (
               <div className="empty-panel">
                 <ShieldCheck size={18} />
-                <span>No audit events found.</span>
+                <span>{t("No audit events found.")}</span>
               </div>
             ) : (
               <div className="table-shell">
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th>Action</th>
-                      <th>Actor</th>
-                      <th>Target</th>
-                      <th>Metadata</th>
-                      <th>Created</th>
+                      <th>{t("Action")}</th>
+                      <th>{t("Actor")}</th>
+                      <th>{t("Target")}</th>
+                      <th>{t("Metadata")}</th>
+                      <th>{t("Created")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -203,10 +203,10 @@ export function AuditLogPage() {
                       <tr key={entry.id}>
                         <td>
                           <span className="status-badge status-neutral">
-                            {formatLabel(entry.action)}
+                            {t(formatLabel(entry.action))}
                           </span>
                         </td>
-                        <td>{entry.actor_username ?? "System"}</td>
+                        <td>{entry.actor_username ?? t("System")}</td>
                         <td>
                           <span className="mono-cell">
                             {entry.target_type}:{entry.target_id.slice(0, 8)}
