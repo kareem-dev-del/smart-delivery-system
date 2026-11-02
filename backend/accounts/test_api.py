@@ -3,6 +3,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 from audit.models import AuditLog
+from orders.models import Order
 
 from .models import UserProfile
 
@@ -185,6 +186,11 @@ class AdminCourierListAPIViewTests(APITestCase):
                     "email": "",
                     "phone": "+201012345678",
                     "role": UserProfile.Role.COURIER,
+                    "is_active": True,
+                    "is_on_shift": False,
+                    "shift_updated_at": None,
+                    "active_order_count": 0,
+                    "dispatch_status": "off_shift",
                 }
             ],
         )
@@ -217,6 +223,9 @@ class AdminManagedAccountAPIViewTests(APITestCase):
 
     def status_url(self, user):
         return reverse("admin-managed-user-status", args=(user.id,))
+
+    def shift_url(self, user):
+        return reverse("admin-courier-shift", args=(user.id,))
 
     def valid_payload(self, **overrides):
         payload = {
@@ -317,9 +326,102 @@ class AdminManagedAccountAPIViewTests(APITestCase):
         self.assertTrue(reactivated.data["is_active"])
         self.assertEqual(AuditLog.objects.filter(action=AuditLog.Action.ACCOUNT_STATUS_CHANGED).count(), 2)
 
+    def test_admin_can_start_and_end_courier_shift(self):
+        self.client.force_authenticate(user=self.admin)
+
+        started = self.client.patch(self.shift_url(self.courier), {"is_on_shift": True}, format="json")
+        self.assertEqual(started.status_code, status.HTTP_200_OK)
+        self.assertTrue(started.data["is_on_shift"])
+        self.assertEqual(started.data["dispatch_status"], "available")
+        self.assertIsNotNone(started.data["shift_updated_at"])
+
+        ended = self.client.patch(self.shift_url(self.courier), {"is_on_shift": False}, format="json")
+        self.assertEqual(ended.status_code, status.HTTP_200_OK)
+        self.assertEqual(ended.data["dispatch_status"], "off_shift")
+        self.assertEqual(AuditLog.objects.filter(action=AuditLog.Action.COURIER_SHIFT_CHANGED).count(), 2)
+
+    def test_cannot_end_shift_while_courier_has_active_orders(self):
+        self.courier.profile.is_on_shift = True
+        self.courier.profile.save(update_fields=("is_on_shift",))
+        Order.objects.create(
+            customer=self.customer,
+            status=Order.Status.ASSIGNED,
+            assigned_courier=self.courier,
+        )
+        self.client.force_authenticate(user=self.admin)
+
+        response = self.client.patch(self.shift_url(self.courier), {"is_on_shift": False}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.courier.profile.refresh_from_db()
+        self.assertTrue(self.courier.profile.is_on_shift)
+
+    def test_cannot_start_shift_for_inactive_courier(self):
+        self.courier.is_active = False
+        self.courier.save(update_fields=("is_active",))
+        self.client.force_authenticate(user=self.admin)
+
+        response = self.client.patch(self.shift_url(self.courier), {"is_on_shift": True}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
     def test_non_admin_cannot_manage_accounts(self):
         self.client.force_authenticate(user=self.customer)
 
         response = self.client.get(self.list_url())
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class CourierSelfShiftAPIViewTests(APITestCase):
+    def setUp(self):
+        self.courier = User.objects.create_user(
+            username="self-shift-courier",
+            password="SafePass123!2026",
+        )
+        self.courier.profile.role = UserProfile.Role.COURIER
+        self.courier.profile.save(update_fields=("role", "updated_at"))
+        self.customer = User.objects.create_user(
+            username="self-shift-customer",
+            password="SafePass123!2026",
+        )
+
+    def url(self):
+        return reverse("courier-self-shift")
+
+    def test_courier_can_read_and_update_own_shift(self):
+        self.client.force_authenticate(user=self.courier)
+        current = self.client.get(self.url())
+        self.assertEqual(current.status_code, status.HTTP_200_OK)
+        self.assertFalse(current.data["is_on_shift"])
+
+        updated = self.client.patch(self.url(), {"is_on_shift": True}, format="json")
+        self.assertEqual(updated.status_code, status.HTTP_200_OK)
+        self.assertTrue(updated.data["is_on_shift"])
+        self.assertEqual(updated.data["dispatch_status"], "available")
+        self.assertEqual(
+            AuditLog.objects.filter(
+                action=AuditLog.Action.COURIER_SHIFT_CHANGED,
+                actor=self.courier,
+            ).count(),
+            1,
+        )
+
+    def test_customer_cannot_change_a_courier_shift(self):
+        self.client.force_authenticate(user=self.customer)
+        response = self.client.patch(self.url(), {"is_on_shift": True}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_courier_cannot_end_shift_with_an_active_order(self):
+        self.courier.profile.is_on_shift = True
+        self.courier.profile.save(update_fields=("is_on_shift",))
+        Order.objects.create(
+            customer=self.customer,
+            assigned_courier=self.courier,
+            status=Order.Status.ASSIGNED,
+        )
+        self.client.force_authenticate(user=self.courier)
+        response = self.client.patch(self.url(), {"is_on_shift": False}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.courier.profile.refresh_from_db()
+        self.assertTrue(self.courier.profile.is_on_shift)

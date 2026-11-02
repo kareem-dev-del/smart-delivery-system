@@ -94,6 +94,60 @@ class LockerStationDetailSerializer(serializers.ModelSerializer):
             "status",
             "drawers",
         )
+
+
+class NearbyLockerQuerySerializer(serializers.Serializer):
+    product_ids = serializers.CharField(max_length=500)
+    latitude = serializers.DecimalField(
+        max_digits=11, decimal_places=8, required=False
+    )
+    longitude = serializers.DecimalField(
+        max_digits=11, decimal_places=8, required=False
+    )
+
+    def validate(self, attrs):
+        if ("latitude" in attrs) != ("longitude" in attrs):
+            raise serializers.ValidationError(
+                "Latitude and longitude must be provided together."
+            )
+        if "latitude" in attrs and not -90 <= attrs["latitude"] <= 90:
+            raise serializers.ValidationError({"latitude": "Invalid latitude."})
+        if "longitude" in attrs and not -180 <= attrs["longitude"] <= 180:
+            raise serializers.ValidationError({"longitude": "Invalid longitude."})
+        try:
+            product_ids = [int(value) for value in attrs["product_ids"].split(",")]
+        except ValueError as error:
+            raise serializers.ValidationError(
+                {"product_ids": "Provide comma-separated product IDs."}
+            ) from error
+        if not product_ids or any(value < 1 for value in product_ids):
+            raise serializers.ValidationError(
+                {"product_ids": "At least one valid product ID is required."}
+            )
+        if len(product_ids) != len(set(product_ids)):
+            raise serializers.ValidationError(
+                {"product_ids": "Product IDs must be unique."}
+            )
+        attrs["product_ids"] = product_ids
+        return attrs
+
+
+class NearbyLockerSerializer(serializers.ModelSerializer):
+    distance_km = serializers.FloatField(allow_null=True)
+    available_drawers_count = serializers.IntegerField()
+
+    class Meta:
+        model = LockerStation
+        fields = (
+            "id",
+            "name",
+            "code",
+            "address",
+            "latitude",
+            "longitude",
+            "distance_km",
+            "available_drawers_count",
+        )
 class AdminLockerStationWriteSerializer(serializers.ModelSerializer):
     code = serializers.CharField(max_length=50)
 
@@ -168,7 +222,7 @@ class PickupQRScanSerializer(serializers.Serializer):
 class OpenDrawerAuthorizationSerializer(serializers.Serializer):
     command = serializers.CharField(read_only=True)
     drawer_number = serializers.IntegerField(read_only=True)
-    order_public_id = serializers.UUIDField(read_only=True)   
+    order_public_id = serializers.UUIDField(read_only=True)
 
 
 class CollectionConfirmationResponseSerializer(serializers.Serializer):
@@ -183,14 +237,14 @@ class ReturnConfirmationResponseSerializer(serializers.Serializer):
     status = serializers.CharField(read_only=True)
     drawer_number = serializers.IntegerField(read_only=True)
     drawer_status = serializers.CharField(read_only=True)
-    returned_at = serializers.DateTimeField(read_only=True)    
+    returned_at = serializers.DateTimeField(read_only=True)
 
 
 class LockerDeviceHeartbeatResponseSerializer(serializers.Serializer):
     device_code = serializers.CharField(read_only=True)
     locker_code = serializers.CharField(read_only=True)
     locker_status = serializers.CharField(read_only=True)
-    last_heartbeat_at = serializers.DateTimeField(read_only=True)    
+    last_heartbeat_at = serializers.DateTimeField(read_only=True)
 
 
 
@@ -269,4 +323,4 @@ class AdminDashboardSummarySerializer(serializers.Serializer):
     )
 
 class LockerDeviceActivationSerializer(serializers.Serializer):
-    is_active = serializers.BooleanField()     
+    is_active = serializers.BooleanField()

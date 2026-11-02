@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    NearbyLockerStationAPIView,
     LockerStationListAPIView,
     LockerStationRetrieveAPIView,
     LockerPickupScanAPIView,
@@ -20,6 +21,7 @@ from .views import (
 
 
 urlpatterns = [
+    path("nearby/", NearbyLockerStationAPIView.as_view(), name="locker-nearby"),
     path("", LockerStationListAPIView.as_view(), name="locker-list"),
     path("<int:pk>/", LockerStationRetrieveAPIView.as_view(), name="locker-detail"),
     path(

@@ -1,3 +1,5 @@
+import math
+
 from django.db.models import Count, Q
 from .services import (
     create_drawer,
@@ -34,13 +36,13 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.permissions import IsAdminRole, IsLockerDevice
+from accounts.permissions import IsAdminRole, IsCustomer, IsLockerDevice
 from orders.services import (
     authorize_pickup_by_qr,
     confirm_package_collection,
     authorize_return_by_qr,
     confirm_package_return,
-    
+
 )
 
 from accounts.throttles import LockerQRScanRateThrottle
@@ -58,6 +60,7 @@ from .models import (
     LockerDeviceRequest,
     LockerStation,
 )
+from products.models import Product
 
 
 
@@ -65,7 +68,7 @@ from .serializers import (
     LockerStationDetailSerializer,
     LockerStationListSerializer,
     OpenDrawerAuthorizationSerializer,
-    PickupQRScanSerializer, 
+    PickupQRScanSerializer,
     CollectionConfirmationResponseSerializer,
     ReturnConfirmationResponseSerializer,
     AdminLockerStationWriteSerializer,
@@ -78,7 +81,92 @@ from .serializers import (
     AdminLockerDeviceSerializer,
     AdminDashboardSummarySerializer,
     LockerDeviceActivationSerializer,
+    NearbyLockerQuerySerializer,
+    NearbyLockerSerializer,
 )
+
+
+class NearbyLockerStationAPIView(APIView):
+    permission_classes = [IsCustomer]
+
+    @extend_schema(
+        parameters=[NearbyLockerQuerySerializer],
+        responses={200: NearbyLockerSerializer(many=True)},
+        tags=["Lockers"],
+    )
+    def get(self, request):
+        query = NearbyLockerQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        data = query.validated_data
+
+        products = list(
+            Product.objects.filter(
+                id__in=data["product_ids"],
+                is_active=True,
+            ).only("id", "size")
+        )
+        if len(products) != len(data["product_ids"]):
+            return Response(
+                {"product_ids": "One or more products are unavailable."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        size_rank = {
+            Product.Size.SMALL: 1,
+            Product.Size.MEDIUM: 2,
+            Product.Size.LARGE: 3,
+        }
+        required_rank = max(size_rank[product.size] for product in products)
+        compatible_sizes = [
+            size for size, rank in size_rank.items() if rank >= required_rank
+        ]
+        stations = list(
+            LockerStation.objects.filter(status=LockerStation.Status.ONLINE)
+            .annotate(
+                available_drawers_count=Count(
+                    "drawers",
+                    filter=Q(
+                        drawers__status=Drawer.Status.AVAILABLE,
+                        drawers__size__in=compatible_sizes,
+                    ),
+                )
+            )
+            .filter(available_drawers_count__gt=0)
+        )
+
+        latitude = data.get("latitude")
+        longitude = data.get("longitude")
+        for station in stations:
+            station.distance_km = None
+            if latitude is not None and longitude is not None:
+                station.distance_km = self._distance_km(
+                    float(latitude),
+                    float(longitude),
+                    float(station.latitude),
+                    float(station.longitude),
+                )
+
+        stations.sort(
+            key=lambda station: (
+                station.distance_km is None,
+                station.distance_km if station.distance_km is not None else 0,
+                station.name.lower(),
+            )
+        )
+        return Response(NearbyLockerSerializer(stations, many=True).data)
+
+    @staticmethod
+    def _distance_km(latitude_a, longitude_a, latitude_b, longitude_b):
+        radians = math.pi / 180
+        latitude_delta = (latitude_b - latitude_a) * radians
+        longitude_delta = (longitude_b - longitude_a) * radians
+        value = (
+            math.sin(latitude_delta / 2) ** 2
+            + math.cos(latitude_a * radians)
+            * math.cos(latitude_b * radians)
+            * math.sin(longitude_delta / 2) ** 2
+        )
+        return round(6371 * 2 * math.asin(math.sqrt(value)), 2)
 
 
 class AdminLockerDeviceActivationAPIView(generics.GenericAPIView):
@@ -514,7 +602,7 @@ class LockerReturnScanAPIView(APIView):
             response_data,
             status=status.HTTP_200_OK,
             headers={"Cache-Control": "no-store"},
-        )      
+        )
 
 
 
@@ -703,7 +791,7 @@ class LockerReturnConfirmationAPIView(APIView):
             response_data,
             status=status.HTTP_200_OK,
             headers={"Cache-Control": "no-store"},
-        )   
+        )
 
 
 
@@ -748,7 +836,7 @@ class LockerDeviceHeartbeatAPIView(APIView):
             response_serializer.data,
             status=status.HTTP_200_OK,
             headers={"Cache-Control": "no-store"},
-        )    
+        )
 
 
 class AdminLockerDeviceListAPIView(generics.ListAPIView):
@@ -765,7 +853,7 @@ class AdminLockerDeviceListAPIView(generics.ListAPIView):
     def get_serializer_context(self):
         context = super().get_serializer_context()
         context["now"] = timezone.now()
-        return context    
+        return context
 
 
 
@@ -790,4 +878,4 @@ class AdminDashboardSummaryAPIView(APIView):
             status=status.HTTP_200_OK,
             headers={"Cache-Control": "no-store"},
         )
-    
+

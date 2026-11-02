@@ -47,6 +47,7 @@ class AuditLog(models.Model):
         )
         ACCOUNT_CREATED = "account_created", "Account Created"
         ACCOUNT_STATUS_CHANGED = "account_status_changed", "Account Status Changed"
+        COURIER_SHIFT_CHANGED = "courier_shift_changed", "Courier Shift Changed"
 
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL,

@@ -142,6 +142,8 @@ class CourierAssignmentListAPIViewTests(APITestCase):
             assigned_order["locker_code"],
             "NASR-001",
         )
+        self.assertEqual(assigned_order["locker_latitude"], "30.062630")
+        self.assertEqual(assigned_order["locker_longitude"], "31.335220")
         self.assertEqual(
             assigned_order["drawer_number"],
             3,
@@ -156,4 +158,6 @@ class CourierAssignmentListAPIViewTests(APITestCase):
             Order.Status.AWAITING_LOCKER,
         )
         self.assertIsNone(awaiting_order["locker_name"])
+        self.assertIsNone(awaiting_order["locker_latitude"])
+        self.assertIsNone(awaiting_order["locker_longitude"])
         self.assertIsNone(awaiting_order["drawer_number"])
