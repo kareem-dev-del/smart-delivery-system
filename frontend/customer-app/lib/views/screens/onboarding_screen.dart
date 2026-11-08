@@ -531,10 +531,6 @@ class _ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isWhite = !isMain
-        ? false
-        : gradient.colors.first == Colors.white;
-
     return Container(
       width: width,
       height: height,

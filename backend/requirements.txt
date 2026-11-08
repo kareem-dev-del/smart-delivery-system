@@ -13,3 +13,5 @@ drf-spectacular==0.30.0
 drf-spectacular-sidecar==2026.10.1
 django-cors-headers==4.9.0
 Pillow==13.0.0
+gunicorn==26.2.0
+whitenoise==6.12.0

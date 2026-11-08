@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -18,8 +20,31 @@ import 'package:shopease_mobile/models/payment_method.dart';
 // كانت بتتعمل هنا محليًا؛ عشان OrderDetailsScreen (اللي بتتفتح فوقها بـ
 // Navigator.push) تقدر توصل لنفس الـinstance وتحدّث الليستة بعد أي تعديل
 // (زي إلغاء أوردر) من غير reload يدوي أو pop-result hacks.
-class OrdersScreen extends StatelessWidget {
+class OrdersScreen extends StatefulWidget {
   const OrdersScreen({super.key});
+
+  @override
+  State<OrdersScreen> createState() => _OrdersScreenState();
+}
+
+class _OrdersScreenState extends State<OrdersScreen> {
+  Timer? _refreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+      if (mounted) {
+        unawaited(context.read<OrdersCubit>().loadOrders(silent: true));
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

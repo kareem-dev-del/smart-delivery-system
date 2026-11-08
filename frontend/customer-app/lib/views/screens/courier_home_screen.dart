@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter/services.dart';
@@ -25,18 +27,27 @@ class _CourierHomeScreenState extends State<CourierHomeScreen> {
   bool _isLoading = true;
   bool _isUpdatingShift = false;
   String? _error;
+  Timer? _refreshTimer;
+  bool _loadInProgress = false;
 
   @override
   void initState() {
     super.initState();
     _load();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      if (mounted && !_loadInProgress) _load(silent: true);
+    });
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+  Future<void> _load({bool silent = false}) async {
+    if (_loadInProgress) return;
+    _loadInProgress = true;
+    if (!silent) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
     try {
       final results = await Future.wait([
         widget.service.getAssignments(),
@@ -49,14 +60,25 @@ class _CourierHomeScreenState extends State<CourierHomeScreen> {
         _returns = results[1] as List<CourierOrder>;
         _isOnShift = results[2] as bool;
         _isLoading = false;
+        _error = null;
       });
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _error = error.toString().replaceFirst('Exception: ', '');
-        _isLoading = false;
+        if (_assignments.isEmpty && _returns.isEmpty) {
+          _error = error.toString().replaceFirst('Exception: ', '');
+        }
+        if (!silent) _isLoading = false;
       });
+    } finally {
+      _loadInProgress = false;
     }
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _changeShift() async {

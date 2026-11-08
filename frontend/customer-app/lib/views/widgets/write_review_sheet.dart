@@ -74,7 +74,6 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
     super.dispose();
   }
 
-  bool get _canSubmit => _rating > 0 && _textController.text.trim().isNotEmpty;
 
   Future<void> _submit() async {
     setState(() {
