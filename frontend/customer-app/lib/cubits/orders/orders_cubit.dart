@@ -10,17 +10,22 @@ class OrdersCubit extends Cubit<OrdersState> {
       : super(const OrdersState(isLoading: true));
 
   final OrdersController ordersController;
+  bool _isLoadingOrders = false;
 
-  Future<void> loadOrders() async {
-    emit(state.copyWith(isLoading: true, clearError: true));
+  Future<void> loadOrders({bool silent = false}) async {
+    if (_isLoadingOrders) return;
+    _isLoadingOrders = true;
+    if (!silent) emit(state.copyWith(isLoading: true, clearError: true));
     try {
       final orders = await ordersController.fetchOrders();
-      emit(state.copyWith(orders: orders, isLoading: false));
+      emit(state.copyWith(orders: orders, isLoading: false, clearError: true));
     } catch (e) {
       emit(state.copyWith(
         isLoading: false,
         error: e.toString().replaceFirst('Exception: ', ''),
       ));
+    } finally {
+      _isLoadingOrders = false;
     }
   }
 

@@ -1,79 +1,36 @@
 # SmartDrop Admin Dashboard
 
-Phase 1 frontend for the Smart Delivery System admin dashboard.
+The admin dashboard is a React and TypeScript web client for managing the SmartDrop delivery network. It uses the Django REST API as its data source.
 
-This app currently includes:
+## Features
 
-- SmartDrop branding
-- Login page
-- JWT auth state
-- Admin protected routes
-- Access denied page
-- Sidebar and topbar dashboard shell
-- Placeholder navigation for future phases
+- JWT sign-in and protected admin routes
+- Dashboard summary, orders, products, categories, locker stations, devices, users, notifications, and audit activity
+- Courier availability and order assignment workflows
+- English and Arabic interface localization
+- Periodic refresh of operational data while the dashboard tab is visible
 
-## Local Setup
-
-Install dependencies:
+## Local development
 
 ```powershell
 npm install
-```
-
-Run the development server:
-
-```powershell
 npm run dev
 ```
 
-Open:
-
-```text
-http://localhost:5173
-```
-
-Build for production:
-
-```powershell
-npm run build
-```
-
-Preview the production build:
-
-```powershell
-npm run preview
-```
-
-## Environment
-
-Create `.env.local` if you need to override defaults:
+Vite serves the app at `http://localhost:5173` by default. The API defaults to `http://127.0.0.1:8000`. To override it, create `.env.local`:
 
 ```env
 VITE_API_BASE_URL=http://127.0.0.1:8000
 ```
 
-The default API origin is `http://127.0.0.1:8000`.
+## Build
 
-## Backend Assumptions
-
-Login:
-
-```http
-POST /api/token/
+```powershell
+npm run typecheck
+npm run build
+npm run preview
 ```
 
-Current user:
+The production bundle is generated in `dist/`. For deployment, set `VITE_API_BASE_URL` to the public HTTPS address of the backend before building.
 
-```http
-GET /api/accounts/me/
-```
-
-Logout:
-
-```http
-POST /api/accounts/logout/
-```
-
-Phase 1 does not render fake operational metrics. Dashboard data, orders,
-lockers, devices, notifications, and audit logs will be connected in later
-phases.
+See the repository [README](../../README.md) for the complete project architecture and setup.

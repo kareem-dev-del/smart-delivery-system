@@ -10,17 +10,22 @@ class TrackOrderCubit extends Cubit<TrackOrderState> {
       : super(const TrackOrderState(isLoading: true));
 
   final TrackOrderController trackOrderController;
+  bool _isLoadingTracking = false;
 
-  Future<void> loadTracking(String orderId) async {
-    emit(state.copyWith(isLoading: true, clearError: true));
+  Future<void> loadTracking(String orderId, {bool silent = false}) async {
+    if (_isLoadingTracking) return;
+    _isLoadingTracking = true;
+    if (!silent) emit(state.copyWith(isLoading: true, clearError: true));
     try {
       final tracking = await trackOrderController.fetchTracking(orderId);
-      emit(state.copyWith(tracking: tracking, isLoading: false));
+      emit(state.copyWith(tracking: tracking, isLoading: false, clearError: true));
     } catch (e) {
       emit(state.copyWith(
         isLoading: false,
         error: e.toString().replaceFirst('Exception: ', ''),
       ));
+    } finally {
+      _isLoadingTracking = false;
     }
   }
 }

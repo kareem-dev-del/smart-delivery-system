@@ -18,6 +18,7 @@ import { useAuth } from "../auth/AuthProvider";
 import { formatDate, formatLabel } from "../lib/format";
 import { useLocale } from "../i18n/LocaleProvider";
 import { StyledSelect } from "../components/StyledSelect";
+import { useAutoRefresh } from "../hooks/use-auto-refresh";
 
 const PAGE_SIZE = 20;
 const orderStatuses = [
@@ -63,13 +64,13 @@ export function OrdersPage() {
     return () => window.clearTimeout(timer);
   }, [searchInput]);
 
-  async function loadOrders() {
+  async function loadOrders(silent = false) {
     if (!tokens?.access) {
       setError("Your session has expired. Sign in again to load orders.");
       setLoading(false);
       return;
     }
-    setLoading(true);
+    if (!silent) setLoading(true);
     setError(null);
     try {
       const [orderData, summaryData] = await Promise.all([
@@ -89,13 +90,15 @@ export function OrdersPage() {
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : "Could not load orders.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }
 
   useEffect(() => {
     void loadOrders();
   }, [tokens?.access, statusFilter, search, page]);
+
+  useAutoRefresh(() => loadOrders(true), 15_000, Boolean(tokens?.access));
 
   const metrics = useMemo(() => {
     const inProgress = ["pending", "awaiting_locker", "assigned", "ready_for_pickup"]

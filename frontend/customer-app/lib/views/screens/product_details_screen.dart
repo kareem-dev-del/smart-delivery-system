@@ -30,7 +30,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   final PageController _pageController = PageController();
   int _currentImageIndex = 0;
   int _quantity = 1;
-  final bool _isFavorite = false;
   bool _descriptionExpanded = false;
   String? _selectedSize;
   String? _selectedColor;

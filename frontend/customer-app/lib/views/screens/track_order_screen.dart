@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shopease_mobile/core/dependency_injection/di.dart';
@@ -25,10 +27,35 @@ class TrackOrderScreen extends StatelessWidget {
   }
 }
 
-class _TrackOrderView extends StatelessWidget {
+class _TrackOrderView extends StatefulWidget {
   const _TrackOrderView({required this.orderId});
 
   final String orderId;
+
+  @override
+  State<_TrackOrderView> createState() => _TrackOrderViewState();
+}
+
+class _TrackOrderViewState extends State<_TrackOrderView> {
+  Timer? _refreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      if (mounted) {
+        unawaited(context
+            .read<TrackOrderCubit>()
+            .loadTracking(widget.orderId, silent: true));
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +71,7 @@ class _TrackOrderView extends StatelessWidget {
             return ErrorState(
               message: state.error!,
               onRetry:
-                  () => context.read<TrackOrderCubit>().loadTracking(orderId),
+                  () => context.read<TrackOrderCubit>().loadTracking(widget.orderId),
             );
           }
 
@@ -56,7 +83,7 @@ class _TrackOrderView extends StatelessWidget {
           return RefreshIndicator(
             color: context.colors.primary,
             onRefresh:
-                () => context.read<TrackOrderCubit>().loadTracking(orderId),
+                () => context.read<TrackOrderCubit>().loadTracking(widget.orderId),
             child: ListView(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),

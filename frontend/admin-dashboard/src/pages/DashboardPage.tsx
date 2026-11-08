@@ -26,6 +26,7 @@ import { getAdminOrders, type AdminOrder } from "../api/orders";
 import { useAuth } from "../auth/AuthProvider";
 import { formatDate, formatLabel } from "../lib/format";
 import { useLocale } from "../i18n/LocaleProvider";
+import { useAutoRefresh } from "../hooks/use-auto-refresh";
 
 const statusColors: Record<string, string> = {
   pending: "#f59e0b",
@@ -329,13 +330,13 @@ export function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  async function loadDashboard() {
+  async function loadDashboard(silent = false) {
     if (!tokens?.access) {
       setError("Missing access token. Please sign in again.");
       setLoading(false);
       return;
     }
-    setLoading(true);
+    if (!silent) setLoading(true);
     setError(null);
     try {
       const [summaryData, auditData, ordersData, notificationsData] = await Promise.all([
@@ -351,13 +352,15 @@ export function DashboardPage() {
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : "Could not load dashboard.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }
 
   useEffect(() => {
     void loadDashboard();
   }, [tokens?.access]);
+
+  useAutoRefresh(() => loadDashboard(true), 20_000, Boolean(tokens?.access));
 
   const health = useMemo(() => summary ? getSystemHealth(summary) : null, [summary]);
   const activeOrders = summary
