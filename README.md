@@ -145,6 +145,8 @@ git push -u origin feat/short-feature-name
 
 This repository currently documents and supports local Docker-based development. It does not yet have a public live URL. Production deployment requires hosted PostgreSQL and Redis, service secrets, allowed-host and CORS configuration, static/media storage, and separately deployed frontend and backend services. Never upload `.env` files, API tokens, or production secrets to GitHub.
 
+See [the portfolio deployment guide](docs/deployment-guide.md) for the required services, environment variables, deployment order, and current media-storage limitation.
+
 ## License
 
 No license has been added yet. Contact the repository owner before reusing this project outside the training or portfolio context.
