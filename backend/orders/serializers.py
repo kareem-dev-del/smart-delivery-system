@@ -71,8 +71,17 @@ class LockerSummarySerializer(serializers.ModelSerializer):
         )
 
 
+class OrderTrackingStepSerializer(serializers.Serializer):
+    title = serializers.CharField()
+    description = serializers.CharField(allow_null=True)
+    timestamp = serializers.DateTimeField(allow_null=True)
+    isCompleted = serializers.BooleanField()
+    isCurrent = serializers.BooleanField()
+
+
 class OrderReadSerializer(serializers.ModelSerializer):
     items = OrderItemReadSerializer(many=True, read_only=True)
+    steps = serializers.SerializerMethodField()
     locker = LockerSummarySerializer(
         source="locker_station",
         read_only=True,
@@ -96,16 +105,106 @@ class OrderReadSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "items",
+            "steps",
         )
         read_only_fields = fields
 
+    @extend_schema_field(OrderTrackingStepSerializer(many=True))
+    def get_steps(self, order) -> list[dict[str, object]]:
+        return build_order_timeline(order)
 
-class OrderTrackingStepSerializer(serializers.Serializer):
-    title = serializers.CharField()
-    description = serializers.CharField(allow_null=True)
-    timestamp = serializers.DateTimeField(allow_null=True)
-    isCompleted = serializers.BooleanField()
-    isCurrent = serializers.BooleanField()
+
+def build_order_timeline(order) -> list[dict[str, object]]:
+    """Return the common read-only milestone timeline for customers and admins."""
+    steps = [
+        ("Order placed", "Your order was created.", order.created_at),
+        (
+            "Locker assigned",
+            "A station and drawer were reserved for your order.",
+            order.assigned_at,
+        ),
+        (
+            "Courier assigned",
+            "A courier was assigned to deliver your order to the locker.",
+            order.courier_assigned_at,
+        ),
+        (
+            "Ready for pickup",
+            "The locker confirmed the package is ready.",
+            order.ready_for_pickup_at,
+        ),
+        ("Collected", "Your order was collected.", order.collected_at),
+    ]
+    if order.pickup_opened_at:
+        steps.insert(
+            4,
+            (
+                "Pickup opened",
+                "A pickup attempt was started at the locker.",
+                order.pickup_opened_at,
+            ),
+        )
+    if order.return_opened_at:
+        steps.append(
+            (
+                "Return started",
+                "The order requires a return to the locker.",
+                order.return_opened_at,
+            )
+        )
+    if order.returned_at:
+        steps.append(("Returned", "The order was returned to the locker.", order.returned_at))
+    if order.cancelled_at:
+        steps.append(("Cancelled", "This order was cancelled.", order.cancelled_at))
+    if order.status == Order.Status.EXPIRED:
+        steps.append(
+            (
+                "Pickup expired",
+                "The pickup window ended before collection.",
+                order.delivery_deadline or order.updated_at,
+            )
+        )
+
+    terminal_statuses = {
+        Order.Status.CANCELLED,
+        Order.Status.EXPIRED,
+        Order.Status.RETURNED,
+    }
+    if order.status in terminal_statuses:
+        steps = [
+            step
+            for step in steps
+            if step[2] is not None
+            or step[0]
+            in {"Cancelled", "Pickup expired", "Return started", "Returned"}
+        ]
+
+    current_title = {
+        Order.Status.AWAITING_LOCKER: "Locker assigned",
+        Order.Status.ASSIGNED: (
+            "Courier assigned" if order.courier_assigned_at is None else "Ready for pickup"
+        ),
+        Order.Status.READY_FOR_PICKUP: "Collected",
+        Order.Status.COLLECTED: "Collected",
+        Order.Status.EXPIRED: "Pickup expired",
+        Order.Status.RETURNED: "Returned",
+        Order.Status.CANCELLED: "Cancelled",
+    }.get(order.status)
+    current_index = next(
+        (i for i, (title, _, _) in enumerate(steps) if title == current_title),
+        None,
+    )
+
+    return [
+        {
+            "title": title,
+            "description": description,
+            "timestamp": timestamp,
+            "isCompleted": timestamp is not None,
+            "isCurrent": index == current_index,
+        }
+        for index, (title, description, timestamp) in enumerate(steps)
+    ]
 
 
 class OrderTrackingSerializer(serializers.ModelSerializer):
@@ -153,52 +252,7 @@ class OrderTrackingSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(OrderTrackingStepSerializer(many=True))
     def get_steps(self, order) -> list[dict[str, object]]:
-        steps = [
-            ("Order placed", "Your order was created.", order.created_at),
-            (
-                "Locker assigned",
-                "A station and drawer were reserved for your order.",
-                order.assigned_at,
-            ),
-            (
-                "Courier assigned",
-                "A courier was assigned to deliver your order to the locker.",
-                order.courier_assigned_at,
-            ),
-            (
-                "Ready for pickup",
-                "The locker confirmed the package is ready.",
-                order.ready_for_pickup_at,
-            ),
-            ("Collected", "Your order was collected.", order.collected_at),
-        ]
-
-        current_index = next(
-            (
-                index
-                for index, (_, _, timestamp) in enumerate(steps)
-                if timestamp is None
-            ),
-            None,
-        )
-        terminal_statuses = (
-            Order.Status.CANCELLED,
-            Order.Status.EXPIRED,
-            Order.Status.RETURNED,
-        )
-        if order.status in terminal_statuses:
-            current_index = None
-
-        return [
-            {
-                "title": title,
-                "description": description,
-                "timestamp": timestamp,
-                "isCompleted": timestamp is not None,
-                "isCurrent": index == current_index,
-            }
-            for index, (title, description, timestamp) in enumerate(steps)
-        ]
+        return build_order_timeline(order)
 
 
 class OrderAdminReadSerializer(OrderReadSerializer):

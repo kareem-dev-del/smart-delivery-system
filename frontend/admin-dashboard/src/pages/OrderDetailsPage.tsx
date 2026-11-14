@@ -50,18 +50,21 @@ function DetailRow({
 }
 
 function TimelineRow({
-  label,
-  value,
+  step,
+  t,
 }: {
-  label: string;
-  value: string | null;
+  step: AdminOrder["steps"][number];
+  t: (value: string) => string;
 }) {
   return (
     <div className="timeline-row">
-      <span className={value ? "timeline-dot active" : "timeline-dot"} />
+      <span
+        className={`timeline-dot${step.isCompleted ? " active" : ""}${step.isCurrent ? " current" : ""}`}
+      />
       <div>
-        <strong>{label}</strong>
-        <p>{formatDate(value)}</p>
+        <strong>{t(step.title)}</strong>
+        {step.description && <p>{t(step.description)}</p>}
+        <p>{formatDate(step.timestamp)}</p>
       </div>
     </div>
   );
@@ -146,6 +149,21 @@ export function OrderDetailsPage() {
 
   useEffect(() => {
     void loadOrder();
+  }, [tokens?.access, publicId]);
+
+  useEffect(() => {
+    const accessToken = tokens?.access;
+    if (!accessToken || !publicId) return;
+
+    const timer = window.setInterval(() => {
+      void getAdminOrder(accessToken, publicId)
+        .then(setOrder)
+        .catch(() => {
+          // Keep the last known timeline visible during a temporary network issue.
+        });
+    }, 15_000);
+
+    return () => window.clearInterval(timer);
   }, [tokens?.access, publicId]);
 
   useEffect(() => {
@@ -625,30 +643,9 @@ export function OrderDetailsPage() {
                 <h3>{t("Timeline")}</h3>
               </div>
               <div className="timeline-list">
-                <TimelineRow label={t("Created")} value={order.created_at} />
-                <TimelineRow
-                  label={t("Courier assigned")}
-                  value={order.courier_assigned_at}
-                />
-                <TimelineRow
-                  label={t("Drawer assigned")}
-                  value={order.assigned_at}
-                />
-                <TimelineRow
-                  label={t("Ready for pickup")}
-                  value={order.ready_for_pickup_at}
-                />
-                <TimelineRow
-                  label={t("Pickup opened")}
-                  value={order.pickup_opened_at}
-                />
-                <TimelineRow label={t("Collected")} value={order.collected_at} />
-                <TimelineRow
-                  label={t("Return opened")}
-                  value={order.return_opened_at}
-                />
-                <TimelineRow label={t("Returned")} value={order.returned_at} />
-                <TimelineRow label={t("Cancelled")} value={order.cancelled_at} />
+                {order.steps.map((step, index) => (
+                  <TimelineRow key={`${step.title}-${index}`} step={step} t={t} />
+                ))}
               </div>
             </article>
           </section>

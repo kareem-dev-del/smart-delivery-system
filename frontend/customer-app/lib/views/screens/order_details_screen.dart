@@ -233,8 +233,7 @@ class _OrderDetailsView extends StatelessWidget {
       };
 }
 
-// [جديد] — بار تحت الشاشة فيه الأكشنز (Cancel/Track/Buy Again)، بنفس
-// المنطق بتاع orders_screen.dart بالظبط عشان الاتنين يتصرفوا بنفس الطريقة
+// Actions for this order: tracking, cancellation, or buying it again.
 class _BottomActions extends StatelessWidget {
   const _BottomActions({required this.order});
 
@@ -246,6 +245,19 @@ class _BottomActions extends StatelessWidget {
         context.watch<OrderDetailsCubit>().state.isCancelling;
 
     final buttons = <Widget>[];
+
+    buttons.add(
+      Expanded(
+        child: OutlinedButton.icon(
+          onPressed: () => Navigator.of(context).pushNamed(
+            AppRoutes.trackOrder,
+            arguments: order.id,
+          ),
+          icon: const Icon(Icons.timeline_rounded, size: 18),
+          label: const Text('Track order'),
+        ),
+      ),
+    );
 
     if (order.isCancellable) {
       buttons.add(
