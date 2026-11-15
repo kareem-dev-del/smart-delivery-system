@@ -199,7 +199,7 @@ def build_order_timeline(order) -> list[dict[str, object]]:
         {
             "title": title,
             "description": description,
-            "timestamp": timestamp,
+            "timestamp": timestamp.isoformat() if timestamp is not None else None,
             "isCompleted": timestamp is not None,
             "isCurrent": index == current_index,
         }
