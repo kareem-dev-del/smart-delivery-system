@@ -18,6 +18,14 @@ export interface OrderLocker {
   longitude: string;
 }
 
+export interface OrderTimelineStep {
+  title: string;
+  description: string | null;
+  timestamp: string | null;
+  isCompleted: boolean;
+  isCurrent: boolean;
+}
+
 export interface AdminOrder {
   public_id: string;
   status: string;
@@ -33,6 +41,7 @@ export interface AdminOrder {
   created_at: string;
   updated_at: string;
   items: OrderItem[];
+  steps: OrderTimelineStep[];
   customer: number;
   customer_username: string;
   assigned_courier: number | null;

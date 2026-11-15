@@ -397,6 +397,7 @@ Important fields:
 - `returned_at`
 - `cancelled_at`
 - `items`
+- `steps`: same order timeline used by the customer tracking endpoint.
 
 ### 7.6 Order Tracking
 
@@ -410,6 +411,9 @@ Authorization: Bearer <customer_access_token>
 The response includes the current order status, assigned courier when present,
 the selected locker and reserved drawer, and timeline timestamps. It does not
 provide live courier GPS; the timeline reflects persisted order events.
+The admin order detail response uses the same `steps` array. Both clients can
+therefore render the same milestones, while authorization limits the customer
+endpoint to that customer's own order.
 
 ```json
 {
@@ -652,7 +656,8 @@ Main fields:
 - `assigned_drawer_number`
 - `pickup_opened_at`
 - `return_opened_at`
-- timeline fields
+- `steps`: ordered milestones with title, description, timestamp, completion,
+  and current-step flags
 - `items`
 
 ### 9.3 Assign Courier
