@@ -706,7 +706,8 @@ Content-Type: application/json
 Ending a shift is rejected while the courier has active orders. Shift changes
 are written to the audit log. Courier assignment also enforces account status,
 shift state, and workload on the backend; the dashboard filter is not a security
-boundary. GPS-based proximity matching is not implemented yet.
+boundary. The courier app may share location while on shift and open; the
+backend clears saved coordinates when the shift ends.
 
 The courier mobile app reads and changes only its own shift:
 
@@ -721,6 +722,21 @@ Authorization: Bearer <courier_access_token>
 ```
 
 The API rejects ending a shift while active orders remain.
+
+Share the authenticated courier's current position:
+
+```http
+POST /api/accounts/couriers/me/location/
+Authorization: Bearer <courier_access_token>
+```
+
+```json
+{ "latitude": 37.7749, "longitude": -122.4194 }
+```
+
+Only the courier can update their own location, and updates are rejected when
+they are off shift. The mobile app sends updates while open, not in the
+background.
 
 ### 9.4 Admin People Management
 
@@ -782,6 +798,20 @@ Request body:
   "courier_id": 3
 }
 ```
+
+Assign the nearest eligible courier to the order's assigned pickup station:
+
+```http
+POST /api/orders/{public_id}/assign-nearest-courier/
+Authorization: Bearer <admin_access_token>
+```
+
+The courier must be active, on shift, free of another active order, and have
+shared a location within the last five minutes. Matching uses straight-line
+distance to the station, not road routing or traffic. If no fresh courier
+location is available, the API returns an actionable error and manual
+assignment remains available. Assignment creates in-app and configured email
+notifications for both the courier and customer.
 
 ### 9.5 Assign Drawer
 

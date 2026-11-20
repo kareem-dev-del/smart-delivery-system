@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shopease_mobile/core/config/app_config.dart';
@@ -7,6 +9,8 @@ import 'package:shopease_mobile/core/routes/routes.dart';
 import 'package:shopease_mobile/core/theme/app_theme.dart';
 import 'package:shopease_mobile/controllers/theme_controller.dart';
 import 'package:shopease_mobile/views/widgets/loading_state.dart';
+import 'package:shopease_mobile/core/dependency_injection/di.dart';
+import 'package:shopease_mobile/services/customer_notification_service.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({
@@ -198,14 +202,7 @@ class ProfileScreen extends StatelessWidget {
                     children: [
                       _ProfileCard(
                         children: [
-                          _ProfileTile(
-                            icon: Icons.notifications_outlined,
-                            label: 'Notifications',
-                            onTap:
-                                () => Navigator.of(
-                                  context,
-                                ).pushNamed(AppRoutes.notifications),
-                          ),
+                          const _NotificationsProfileTile(),
                           _ProfileTile(
                             icon: Icons.shopping_bag_outlined,
                             label: 'My Orders',
@@ -332,6 +329,62 @@ class ProfileScreen extends StatelessWidget {
       await authCubit.logout();
     }
   }
+}
+
+class _NotificationsProfileTile extends StatefulWidget {
+  const _NotificationsProfileTile();
+
+  @override
+  State<_NotificationsProfileTile> createState() =>
+      _NotificationsProfileTileState();
+}
+
+class _NotificationsProfileTileState extends State<_NotificationsProfileTile> {
+  late final CustomerNotificationService _notifications =
+      CustomerNotificationService(client: AppBlocProviders.apiClient);
+  Timer? _notificationTimer;
+  int _unreadCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUnreadCount();
+    _notificationTimer = Timer.periodic(const Duration(seconds: 45), (_) {
+      _loadUnreadCount();
+    });
+  }
+
+  @override
+  void dispose() {
+    _notificationTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadUnreadCount() async {
+    try {
+      final unread = await _notifications.getUnreadCount();
+      if (mounted) setState(() => _unreadCount = unread);
+    } catch (_) {
+      // Notification access remains available when the count cannot load.
+    }
+  }
+
+  Future<void> _openNotifications() async {
+    await Navigator.of(context).pushNamed(AppRoutes.notifications);
+    if (!mounted) return;
+    await _loadUnreadCount();
+  }
+
+  @override
+  Widget build(BuildContext context) => _ProfileTile(
+    icon: Icons.notifications_outlined,
+    label: 'Notifications',
+    badge:
+        _unreadCount == 0
+            ? null
+            : (_unreadCount > 99 ? '99+' : '$_unreadCount'),
+    onTap: _openNotifications,
+  );
 }
 
 class _ProfileCard extends StatelessWidget {
@@ -515,8 +568,9 @@ class _ThemeModeTile extends StatelessWidget {
         );
       },
     );
-    if (selected != null) {
-      await context.read<ThemeController>().setThemeMode(selected);
+    if (selected != null && context.mounted) {
+      final themeController = context.read<ThemeController>();
+      await themeController.setThemeMode(selected);
     }
   }
 }

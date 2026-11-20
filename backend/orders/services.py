@@ -1,8 +1,10 @@
 from datetime import timedelta
 from decimal import Decimal
+from math import asin, cos, radians, sin, sqrt
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import Exists, OuterRef
 from django.utils import timezone
 
 from notifications.models import Notification
@@ -35,6 +37,7 @@ User = get_user_model()
 PICKUP_WINDOW = timedelta(hours=48)
 QR_TOKEN_LIFETIME = timedelta(minutes=10)
 RETURN_QR_TOKEN_LIFETIME = timedelta(minutes=10)
+COURIER_LOCATION_MAX_AGE = timedelta(minutes=5)
 SIZE_RANK = {
     Product.Size.SMALL: 1,
     Product.Size.MEDIUM: 2,
@@ -1174,6 +1177,25 @@ def assign_courier_to_order(*,order_public_id, courier_id,actor=None):
     ).exclude(pk=order.pk).exists():
         raise ValidationError({"courier_id": "Selected courier already has an active order."})
 
+    previous_courier = (
+        order.assigned_courier
+        if order.assigned_courier_id and order.assigned_courier_id != courier.id
+        else None
+    )
+    if previous_courier:
+        create_notification(
+            user=previous_courier,
+            order=order,
+            notification_type=Notification.Type.COURIER_ASSIGNMENT_CHANGED,
+            title="Order reassigned",
+            message="This order was reassigned and is no longer in your delivery tasks.",
+            data={
+                "order_public_id": str(order.public_id),
+                "status": order.status,
+                "next_step": "no_action",
+            },
+        )
+
     order.assigned_courier = courier
     order.courier_assigned_at = timezone.now()
     order.full_clean()
@@ -1207,6 +1229,30 @@ def assign_courier_to_order(*,order_public_id, courier_id,actor=None):
         },
     )
 
+    if order.status == Order.Status.EXPIRED:
+        customer_title = "A return courier is assigned"
+        customer_message = "Your pickup window ended. A courier is returning the order to the station."
+        customer_next_step = "return_to_station"
+        customer_notification_type = Notification.Type.COURIER_RETURN_REQUIRED
+    else:
+        customer_title = "A courier is assigned to your order"
+        customer_message = "Your order is being prepared for delivery to the pickup station."
+        customer_next_step = "courier_delivery"
+        customer_notification_type = Notification.Type.COURIER_ASSIGNED
+
+    create_notification(
+        user=order.customer,
+        order=order,
+        notification_type=customer_notification_type,
+        title=customer_title,
+        message=customer_message,
+        data={
+            "order_public_id": str(order.public_id),
+            "status": order.status,
+            "next_step": customer_next_step,
+        },
+    )
+
 
     create_audit_log(
     actor=actor,
@@ -1221,6 +1267,90 @@ def assign_courier_to_order(*,order_public_id, courier_id,actor=None):
 
 
     return order
+
+
+def _distance_km(lat1, lon1, lat2, lon2):
+    earth_radius_km = 6371.0088
+    lat1, lon1, lat2, lon2 = map(radians, map(float, (lat1, lon1, lat2, lon2)))
+    delta_lat = lat2 - lat1
+    delta_lon = lon2 - lon1
+    haversine = (
+        sin(delta_lat / 2) ** 2
+        + cos(lat1) * cos(lat2) * sin(delta_lon / 2) ** 2
+    )
+    return 2 * earth_radius_km * asin(sqrt(haversine))
+
+
+@transaction.atomic
+def assign_nearest_courier_to_order(*, order_public_id, actor=None, now=None):
+    now = now or timezone.now()
+    try:
+        order = Order.objects.select_related("locker_station").get(
+            public_id=order_public_id
+        )
+    except Order.DoesNotExist as error:
+        raise ValidationError({"order": "Order not found."}) from error
+
+    if not order.locker_station_id:
+        raise ValidationError(
+            {"detail": "Assign a pickup station before choosing the nearest courier."}
+        )
+
+    active_statuses = (
+        Order.Status.AWAITING_LOCKER,
+        Order.Status.ASSIGNED,
+        Order.Status.EXPIRED,
+    )
+    other_active_orders = Order.objects.filter(
+        assigned_courier_id=OuterRef("pk"),
+        status__in=active_statuses,
+    ).exclude(pk=order.pk)
+
+    eligible = User.objects.filter(
+        is_active=True,
+        profile__role=UserProfile.Role.COURIER,
+        profile__is_on_shift=True,
+        profile__courier_latitude__isnull=False,
+        profile__courier_longitude__isnull=False,
+        profile__courier_location_updated_at__gte=now - COURIER_LOCATION_MAX_AGE,
+    ).annotate(
+        has_other_active_order=Exists(other_active_orders)
+    ).filter(
+        has_other_active_order=False
+    ).select_related("profile")
+
+    couriers = list(eligible)
+    if not couriers:
+        raise ValidationError(
+            {
+                "detail": (
+                    "No available courier has shared a recent location. Ask an on-shift "
+                    "courier to open the app and enable location, or assign manually."
+                )
+            }
+        )
+
+    station = order.locker_station
+    distances = [
+        (
+            courier,
+            _distance_km(
+                courier.profile.courier_latitude,
+                courier.profile.courier_longitude,
+                station.latitude,
+                station.longitude,
+            ),
+        )
+        for courier in couriers
+    ]
+    courier, distance_km = min(distances, key=lambda pair: pair[1])
+
+    assigned_order = assign_courier_to_order(
+        order_public_id=order_public_id,
+        courier_id=courier.id,
+        actor=actor,
+    )
+    return assigned_order, distance_km, courier.profile.courier_location_updated_at
 
 
 @transaction.atomic

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:shopease_mobile/core/dependency_injection/di.dart';
 import 'package:shopease_mobile/core/routes/routes.dart';
@@ -22,6 +24,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   late Future<List<CustomerNotification>> _notifications =
       _service.getNotifications();
   bool _markingAll = false;
+  Timer? _refreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) _refresh().catchError((_) {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
 
   Future<void> _refresh() async {
     final request = _service.getNotifications();
@@ -76,7 +93,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
     final orderId = notification.orderPublicId;
     if (widget.courierMode) {
-      _showMessage('Check the Courier hub for your assigned task.');
+      _showMessage(
+        notification.notificationType == 'courier_assignment_changed'
+            ? 'This order was reassigned. Refresh your Courier hub to update your tasks.'
+            : 'Check the Courier hub for your assigned task.',
+      );
       return;
     }
     if (orderId != null && orderId.isNotEmpty && mounted) {

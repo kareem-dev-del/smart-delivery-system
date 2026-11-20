@@ -16,6 +16,10 @@ class Notification(models.Model):
             "courier_assigned",
             "Courier Assigned",
         )
+        COURIER_ASSIGNMENT_CHANGED = (
+            "courier_assignment_changed",
+            "Courier Assignment Changed",
+        )
         ORDER_COURIER_PICKED_UP = (
             "order_courier_picked_up",
             "Order Courier Picked Up",

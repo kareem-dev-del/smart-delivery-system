@@ -52,6 +52,7 @@ from .services import (
     confirm_order_deposit,
     issue_pickup_qr_token,
     assign_courier_to_order,
+    assign_nearest_courier_to_order,
     issue_return_qr_token,
     cancel_order,
     update_courier_delivery_progress,
@@ -484,6 +485,37 @@ class OrderCourierAssignmentAPIView(generics.GenericAPIView):
             response_serializer.data,
             status=status.HTTP_200_OK,
         )       
+
+
+@extend_schema(
+    tags=["Order Administration"],
+    responses={status.HTTP_200_OK: OrderCourierAssignmentResponseSerializer},
+)
+class OrderNearestCourierAssignmentAPIView(APIView):
+    permission_classes = [IsAdminRole]
+
+    def post(self, request, public_id):
+        try:
+            order, distance_km, location_updated_at = assign_nearest_courier_to_order(
+                order_public_id=public_id,
+                actor=request.user,
+            )
+        except DjangoValidationError as error:
+            detail = getattr(error, "message_dict", {"detail": error.messages})
+            return Response(detail, status=status.HTTP_400_BAD_REQUEST)
+
+        payload = OrderCourierAssignmentResponseSerializer(
+            instance={
+                "order_public_id": order.public_id,
+                "courier_id": order.assigned_courier_id,
+                "courier_username": order.assigned_courier.username,
+                "courier_assigned_at": order.courier_assigned_at,
+            }
+        ).data
+        payload["distance_km"] = round(distance_km, 2)
+        payload["distance_method"] = "straight_line"
+        payload["location_updated_at"] = location_updated_at
+        return Response(payload, status=status.HTTP_200_OK)
 
 class CourierAssignmentListAPIView(generics.ListAPIView):
     serializer_class = CourierAssignmentOrderSerializer

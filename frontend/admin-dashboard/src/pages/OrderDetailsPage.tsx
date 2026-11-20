@@ -12,6 +12,7 @@ import {
 
 import { getAdminCouriers, type AdminCourier } from "../api/accounts";
 import {
+  assignNearestCourierToOrder,
   assignCourierToOrder,
   assignOrderToDrawer,
   getAdminOrder,
@@ -94,6 +95,7 @@ export function OrderDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [drawerLoading, setDrawerLoading] = useState(false);
   const [assigningCourier, setAssigningCourier] = useState(false);
+  const [autoAssigningCourier, setAutoAssigningCourier] = useState(false);
   const [assigningDrawer, setAssigningDrawer] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
@@ -305,6 +307,44 @@ export function OrderDetailsPage() {
     }
   }
 
+  async function handleNearestCourierAssignment() {
+    if (!tokens?.access || !order) return;
+    setAutoAssigningCourier(true);
+    setAssignmentError(null);
+    setAssignmentNotice(null);
+    try {
+      const assignment = await assignNearestCourierToOrder(
+        tokens.access,
+        order.public_id,
+      );
+      setOrder((currentOrder) =>
+        currentOrder
+          ? {
+              ...currentOrder,
+              assigned_courier: assignment.courier_id,
+              assigned_courier_username: assignment.courier_username,
+              courier_assigned_at: assignment.courier_assigned_at,
+            }
+          : currentOrder,
+      );
+      setSelectedCourierId(String(assignment.courier_id));
+      const distance = assignment.distance_km;
+      setAssignmentNotice(
+        locale === "ar"
+          ? `تم تعيين أقرب مندوب: ${assignment.courier_username}${distance == null ? "" : ` (حوالي ${distance} كم بخط مستقيم)`}.`
+          : `Nearest courier ${assignment.courier_username} assigned${distance == null ? "" : ` (${distance} km straight-line)`}.`,
+      );
+    } catch (caughtError) {
+      setAssignmentError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Could not find a nearby available courier.",
+      );
+    } finally {
+      setAutoAssigningCourier(false);
+    }
+  }
+
   function handleLockerChange(lockerId: string) {
     setSelectedLockerId(lockerId);
     setSelectedDrawerId("");
@@ -411,8 +451,19 @@ export function OrderDetailsPage() {
                   <h2 id="courier-assignment-heading">{t("Courier assignment")}</h2>
                 </div>
                 <p>
-                  {t("Choose an on-shift courier with no other active order. Live location and distance-based matching are not available yet.")}
+                  {t("Auto assignment uses a courier's location shared in the last 5 minutes and straight-line distance to the assigned pickup station. Location is shared only while the courier is on shift and the app is open.")}
                 </p>
+
+                <button
+                  className="assignment-submit"
+                  type="button"
+                  onClick={handleNearestCourierAssignment}
+                  disabled={autoAssigningCourier || assigningCourier || !order.locker}
+                  title={!order.locker ? t("Assign a pickup station first.") : undefined}
+                >
+                  <UserRoundPlus size={15} />
+                  {t(autoAssigningCourier ? "Finding nearest courier..." : "Auto-assign nearest courier")}
+                </button>
               </div>
 
               {assignableCouriers.length === 0 ? (
