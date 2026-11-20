@@ -38,6 +38,7 @@ class OrderTracking {
   const OrderTracking({
     required this.orderId,
     required this.status,
+    this.courierPickedUpAt,
     this.trackingNumber,
     this.courier,
     this.estimatedDelivery,
@@ -51,6 +52,7 @@ class OrderTracking {
 
   final String orderId;
   final String status;
+  final String? courierPickedUpAt;
   final String? trackingNumber;
   final String? courier;
   final String? estimatedDelivery;
@@ -73,6 +75,7 @@ class OrderTracking {
     return OrderTracking(
       orderId: '${json['orderId'] ?? json['order_id'] ?? ''}',
       status: '${json['status'] ?? 'pending'}',
+      courierPickedUpAt: json['courier_picked_up_at'] as String?,
       trackingNumber:
           (json['trackingNumber'] ?? json['tracking_number']) as String?,
       courier: json['courier'] as String?,
@@ -91,6 +94,7 @@ class OrderTracking {
   Map<String, dynamic> toJson() => {
     'orderId': orderId,
     'status': status,
+    'courier_picked_up_at': courierPickedUpAt,
     'trackingNumber': trackingNumber,
     'courier': courier,
     'estimatedDelivery': estimatedDelivery,

@@ -459,6 +459,8 @@ const messages: Record<string, string> = {
   "Locker code": "رمز المحطة",
   "Total items": "إجمالي المنتجات",
   "Courier assigned": "تم تعيين المندوب",
+  "Picked up by courier": "استلم المندوب الطلب",
+  "The courier picked up your order for delivery to the station.": "استلم المندوب طلبك لتوصيله إلى المحطة.",
   "Drawer assigned": "تم تخصيص الدرج",
   "Pickup opened": "بدأ الاستلام",
   "Return opened": "بدأ الإرجاع",

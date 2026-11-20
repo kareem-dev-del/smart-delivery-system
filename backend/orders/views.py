@@ -42,6 +42,7 @@ from .serializers import (
     OrderCourierAssignmentSerializer,
     CourierReturnQRResponseSerializer,
     CourierAssignmentOrderSerializer,
+    CourierProgressUpdateSerializer,
     OrderAdminReadSerializer,
     OrderTrackingSerializer,
     AdminOrderListFilterSerializer,
@@ -53,6 +54,7 @@ from .services import (
     assign_courier_to_order,
     issue_return_qr_token,
     cancel_order,
+    update_courier_delivery_progress,
 )
 
 
@@ -503,6 +505,29 @@ class CourierAssignmentListAPIView(generics.ListAPIView):
             .prefetch_related("items")
             .order_by("courier_assigned_at", "created_at")
         )
+
+
+class CourierProgressUpdateAPIView(APIView):
+    permission_classes = [IsCourier]
+
+    @extend_schema(
+        tags=["Courier"],
+        request=CourierProgressUpdateSerializer,
+        responses={status.HTTP_200_OK: CourierAssignmentOrderSerializer},
+    )
+    def post(self, request, public_id):
+        serializer = CourierProgressUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            order = update_courier_delivery_progress(
+                order_public_id=public_id,
+                courier=request.user,
+                action=serializer.validated_data["action"],
+            )
+        except DjangoValidationError as error:
+            detail = getattr(error, "message_dict", {"detail": error.messages})
+            return Response(detail, status=status.HTTP_400_BAD_REQUEST)
+        return Response(CourierAssignmentOrderSerializer(order).data)
 
 
 

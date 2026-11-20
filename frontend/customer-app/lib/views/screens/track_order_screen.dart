@@ -44,9 +44,12 @@ class _TrackOrderViewState extends State<_TrackOrderView> {
     super.initState();
     _refreshTimer = Timer.periodic(const Duration(seconds: 15), (_) {
       if (mounted) {
-        unawaited(context
-            .read<TrackOrderCubit>()
-            .loadTracking(widget.orderId, silent: true));
+        unawaited(
+          context.read<TrackOrderCubit>().loadTracking(
+            widget.orderId,
+            silent: true,
+          ),
+        );
       }
     });
   }
@@ -71,7 +74,9 @@ class _TrackOrderViewState extends State<_TrackOrderView> {
             return ErrorState(
               message: state.error!,
               onRetry:
-                  () => context.read<TrackOrderCubit>().loadTracking(widget.orderId),
+                  () => context.read<TrackOrderCubit>().loadTracking(
+                    widget.orderId,
+                  ),
             );
           }
 
@@ -83,7 +88,9 @@ class _TrackOrderViewState extends State<_TrackOrderView> {
           return RefreshIndicator(
             color: context.colors.primary,
             onRefresh:
-                () => context.read<TrackOrderCubit>().loadTracking(widget.orderId),
+                () => context.read<TrackOrderCubit>().loadTracking(
+                  widget.orderId,
+                ),
             child: ListView(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
@@ -109,7 +116,7 @@ class _TrackOrderViewState extends State<_TrackOrderView> {
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              _statusLabel(tracking.status),
+                              _statusLabel(tracking),
                               style: TextStyle(
                                 color: context.colors.foreground,
                                 fontWeight: FontWeight.w700,
@@ -121,7 +128,7 @@ class _TrackOrderViewState extends State<_TrackOrderView> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        _statusDescription(tracking.status),
+                        _statusDescription(tracking),
                         style: TextStyle(
                           color: context.colors.mutedForeground,
                           fontSize: 12.5,
@@ -225,9 +232,12 @@ class _TrackOrderViewState extends State<_TrackOrderView> {
     );
   }
 
-  String _statusLabel(String status) => switch (status) {
+  String _statusLabel(OrderTracking tracking) => switch (tracking.status) {
     'awaiting_locker' => 'Waiting for locker assignment',
-    'assigned' => 'Courier assigned',
+    'assigned' =>
+      tracking.courierPickedUpAt == null
+          ? 'Courier assigned'
+          : 'Out for delivery',
     'ready_for_pickup' => 'Ready for pickup',
     'collected' => 'Collected',
     'expired' => 'Pickup window expired',
@@ -236,10 +246,13 @@ class _TrackOrderViewState extends State<_TrackOrderView> {
     _ => status.replaceAll('_', ' '),
   };
 
-  String _statusDescription(String status) => switch (status) {
+  String _statusDescription(OrderTracking tracking) => switch (tracking
+      .status) {
     'awaiting_locker' => 'We are preparing your order for a locker station.',
     'assigned' =>
-      'Your order is assigned and awaiting delivery to the station.',
+      tracking.courierPickedUpAt == null
+          ? 'Your order is assigned and awaiting delivery to the station.'
+          : 'The courier has picked up your order and is taking it to the station.',
     'ready_for_pickup' => 'Your order is waiting at the station shown below.',
     'collected' => 'Your order has been picked up successfully.',
     'expired' => 'The pickup period ended. The order is being returned.',

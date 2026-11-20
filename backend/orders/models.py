@@ -47,6 +47,7 @@ class Order(models.Model):
     null=True,
     blank=True,  
     )
+    courier_picked_up_at = models.DateTimeField(null=True, blank=True)
 
     status = models.CharField(
         max_length=20,
@@ -222,4 +223,4 @@ class QRToken(models.Model):
         )
 
     def __str__(self):
-        return f"QR token for order {str(self.order.public_id)[:8]}"    
+        return f"QR token for order {str(self.order.public_id)[:8]}"

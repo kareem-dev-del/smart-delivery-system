@@ -1,3 +1,5 @@
+import 'package:shopease_mobile/models/order_tracking.dart';
+
 class CourierOrderItem {
   const CourierOrderItem({
     required this.name,
@@ -37,6 +39,12 @@ class CourierOrder {
     required this.lockerLongitude,
     required this.drawerNumber,
     required this.items,
+    this.courierAssignedAt,
+    this.courierPickedUpAt,
+    this.assignedAt,
+    this.createdAt,
+    this.readyForPickupAt,
+    this.steps = const [],
   });
 
   final String publicId;
@@ -48,6 +56,12 @@ class CourierOrder {
   final double? lockerLongitude;
   final int? drawerNumber;
   final List<CourierOrderItem> items;
+  final String? courierAssignedAt;
+  final String? courierPickedUpAt;
+  final String? assignedAt;
+  final String? createdAt;
+  final String? readyForPickupAt;
+  final List<TrackingStep> steps;
 
   factory CourierOrder.fromJson(Map<String, dynamic> json) {
     final rawItems = json['items'];
@@ -82,6 +96,21 @@ class CourierOrder {
                     (item) => CourierOrderItem.fromJson(
                       Map<String, dynamic>.from(item),
                     ),
+                  )
+                  .toList(growable: false)
+              : const [],
+      courierAssignedAt: _readNullableString(json['courier_assigned_at']),
+      courierPickedUpAt: _readNullableString(json['courier_picked_up_at']),
+      assignedAt: _readNullableString(json['assigned_at']),
+      createdAt: _readNullableString(json['created_at']),
+      readyForPickupAt: _readNullableString(json['ready_for_pickup_at']),
+      steps:
+          json['steps'] is List
+              ? (json['steps'] as List)
+                  .whereType<Map>()
+                  .map(
+                    (step) =>
+                        TrackingStep.fromJson(Map<String, dynamic>.from(step)),
                   )
                   .toList(growable: false)
               : const [],

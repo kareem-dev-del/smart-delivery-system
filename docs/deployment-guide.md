@@ -6,7 +6,7 @@ This guide describes a first public demo deployment for SmartDrop. It is for a p
 
 | Component | Purpose | Configuration |
 |---|---|---|
-| Django API | Auth, products, orders, lockers, and admin APIs | Docker image from `backend/Dockerfile`, run migrations, then Gunicorn |
+| Django API | Auth, products, orders, lockers, and admin APIs | Docker image from `backend/Dockerfile`; its default command runs migrations before Gunicorn |
 | PostgreSQL | Persistent application data | Managed PostgreSQL; use the provider's private connection values |
 | Redis | Cache and Celery broker | Managed Redis; set both `REDIS_URL` and `CELERY_BROKER_URL` |
 | Celery worker | Processes queued notification email tasks | Same backend image; command `celery -A config worker --loglevel=INFO --concurrency=1` |
@@ -58,7 +58,7 @@ Replace `Postgres` and `Redis` in the references if the database services use di
 ## Deploy order
 
 1. Create the managed PostgreSQL and Redis services.
-2. Deploy the backend web service from the repository's `backend` directory and `Dockerfile`. Set the environment variables above. Start command:
+2. Deploy the backend web service from the repository's `backend` directory and `Dockerfile`. Set the environment variables above and leave the Dockerfile start command in place. If the host requires an explicit command, use:
 
    ```sh
    python manage.py migrate && gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 2 --access-logfile - --error-logfile -
@@ -71,7 +71,7 @@ Replace `Postgres` and `Redis` in the references if the database services use di
 
 The repository includes a Render Blueprint at `render.yaml` for the static dashboard. When creating the Blueprint, provide `VITE_API_BASE_URL` as the API's public HTTPS origin. Render rewrites client-side routes to `index.html`.
 
-On Railway, configure the API service's root directory as `/backend`, Dockerfile as `Dockerfile`, and health check path as `/ready/`. Its start command runs migrations before Gunicorn as shown above. Create the worker and Beat as separate services from that same root and Dockerfile, replacing their Docker start commands with the commands in the service table. Add a public domain to the API service, then set `ALLOWED_HOSTS` to its hostname (without `https://`).
+On Railway, configure the API service's root directory as `/backend`, Dockerfile as `Dockerfile`, and health check path as `/ready/`. The default Dockerfile command runs migrations before Gunicorn. Create the worker and Beat as separate services from that same root and Dockerfile, replacing their Docker start commands with the commands in the service table. Add a public domain to the API service, then set `ALLOWED_HOSTS` to its hostname (without `https://`).
 
 ## Email and product images
 

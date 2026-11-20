@@ -96,6 +96,7 @@ class OrderReadSerializer(serializers.ModelSerializer):
             "total_amount",
             "locker",
             "courier_assigned_at",
+            "courier_picked_up_at",
             "assigned_at",
             "ready_for_pickup_at",
             "delivery_deadline",
@@ -127,6 +128,11 @@ def build_order_timeline(order) -> list[dict[str, object]]:
             "Courier assigned",
             "A courier was assigned to deliver your order to the locker.",
             order.courier_assigned_at,
+        ),
+        (
+            "Picked up by courier",
+            "The courier picked up your order for delivery to the station.",
+            order.courier_picked_up_at,
         ),
         (
             "Ready for pickup",
@@ -182,7 +188,11 @@ def build_order_timeline(order) -> list[dict[str, object]]:
     current_title = {
         Order.Status.AWAITING_LOCKER: "Locker assigned",
         Order.Status.ASSIGNED: (
-            "Courier assigned" if order.courier_assigned_at is None else "Ready for pickup"
+            "Courier assigned"
+            if order.courier_assigned_at is None
+            else "Picked up by courier"
+            if order.courier_picked_up_at is None
+            else "Ready for pickup"
         ),
         Order.Status.READY_FOR_PICKUP: "Collected",
         Order.Status.COLLECTED: "Collected",
@@ -234,6 +244,7 @@ class OrderTrackingSerializer(serializers.ModelSerializer):
             "order_id",
             "tracking_number",
             "status",
+            "courier_picked_up_at",
             "courier",
             "estimated_delivery",
             "locker_name",
@@ -319,6 +330,7 @@ class CourierOrderItemSerializer(serializers.ModelSerializer):
 
 class CourierAssignmentOrderSerializer(serializers.ModelSerializer):
     items = CourierOrderItemSerializer(many=True, read_only=True)
+    steps = serializers.SerializerMethodField()
 
     locker_name = serializers.CharField(
         source="locker_station.name",
@@ -367,10 +379,17 @@ class CourierAssignmentOrderSerializer(serializers.ModelSerializer):
             "locker_longitude",
             "drawer_number",
             "courier_assigned_at",
+            "courier_picked_up_at",
             "assigned_at",
+            "ready_for_pickup_at",
             "created_at",
             "items",
+            "steps",
         )
+
+    @extend_schema_field(OrderTrackingStepSerializer(many=True))
+    def get_steps(self, order) -> list[dict[str, object]]:
+        return build_order_timeline(order)
 
 
 class OrderDrawerAssignmentSerializer(serializers.Serializer):
@@ -398,6 +417,10 @@ class CourierReturnQRResponseSerializer(serializers.Serializer):
 
 class OrderCourierAssignmentSerializer(serializers.Serializer):
     courier_id = serializers.IntegerField(min_value=1)
+
+
+class CourierProgressUpdateSerializer(serializers.Serializer):
+    action = serializers.ChoiceField(choices=("picked_up", "delivered_to_locker"))
 
 
 class OrderCourierAssignmentResponseSerializer(serializers.Serializer):

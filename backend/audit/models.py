@@ -19,6 +19,10 @@ class AuditLog(models.Model):
             "order_courier_assigned",
             "Order Courier Assigned",
         )
+        ORDER_COURIER_PROGRESS_UPDATED = (
+            "order_courier_progress_updated",
+            "Order Courier Progress Updated",
+        )
         ORDER_CANCELLED = "order_cancelled", "Order Cancelled"
         LOCKER_STATION_CREATED = (
             "locker_station_created",

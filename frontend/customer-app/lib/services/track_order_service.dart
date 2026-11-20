@@ -10,7 +10,7 @@ class TrackOrderService {
   // assigned courier, and a timeline built from persisted order timestamps.
   Future<OrderTracking> fetchTracking(String orderId) {
     return _client.get<OrderTracking>(
-      '/orders/$orderId/tracking/',
+      '/api/orders/$orderId/tracking/',
       parser: (data) {
         final trackingJson =
             data is Map<String, dynamic>

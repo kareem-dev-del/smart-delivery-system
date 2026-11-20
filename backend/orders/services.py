@@ -564,6 +564,108 @@ def confirm_order_deposit(*, order_public_id, device_user):
 
     return order
 
+
+@transaction.atomic
+def update_courier_delivery_progress(*, order_public_id, courier, action):
+    """Record courier-confirmed delivery milestones without locker hardware."""
+    try:
+        order = (
+            Order.objects.select_for_update(of=("self",))
+            .select_related("customer", "locker_station", "assigned_drawer")
+            .get(public_id=order_public_id)
+        )
+    except Order.DoesNotExist as error:
+        raise ValidationError({"order": "Order not found."}) from error
+
+    if order.assigned_courier_id != courier.id:
+        raise ValidationError({"order": "This order is not assigned to you."})
+
+    if action == "picked_up" and order.courier_picked_up_at:
+        return order
+    if (
+        action == "delivered_to_locker"
+        and order.status == Order.Status.READY_FOR_PICKUP
+        and order.ready_for_pickup_at
+    ):
+        return order
+    if order.status != Order.Status.ASSIGNED:
+        raise ValidationError({"order": "This order is no longer in delivery."})
+    if not order.locker_station_id or not order.assigned_drawer_id:
+        raise ValidationError({"order": "The order has no assigned station and drawer."})
+
+    now = timezone.now()
+    if action == "picked_up":
+        order.courier_picked_up_at = now
+        order.save(update_fields=("courier_picked_up_at", "updated_at"))
+        create_notification(
+            user=order.customer,
+            order=order,
+            notification_type=Notification.Type.ORDER_COURIER_PICKED_UP,
+            title="Courier picked up your order",
+            message="Your order has been picked up and is on its way to the station.",
+            data={"order_public_id": str(order.public_id)},
+        )
+        create_audit_log(
+            actor=courier,
+            action=AuditLog.Action.ORDER_COURIER_PROGRESS_UPDATED,
+            target_type=AuditLog.TargetType.ORDER,
+            target_id=order.public_id,
+            metadata={"action": action, "source": "courier_app"},
+        )
+        return order
+
+    if action != "delivered_to_locker":
+        raise ValidationError({"action": "Unsupported courier progress action."})
+    if not order.courier_picked_up_at:
+        raise ValidationError({"action": "Confirm pickup before delivery to the station."})
+
+    drawer = Drawer.objects.select_for_update().get(id=order.assigned_drawer_id)
+    if drawer.status != Drawer.Status.RESERVED:
+        raise ValidationError({"drawer": "The assigned drawer is no longer reserved."})
+
+    drawer.status = Drawer.Status.OCCUPIED
+    drawer.save(update_fields=("status", "updated_at"))
+    order.status = Order.Status.READY_FOR_PICKUP
+    order.ready_for_pickup_at = now
+    order.delivery_deadline = now + PICKUP_WINDOW
+    order.save(
+        update_fields=(
+            "status",
+            "ready_for_pickup_at",
+            "delivery_deadline",
+            "updated_at",
+        )
+    )
+    LockerEventLog.objects.create(
+        locker_station=order.locker_station,
+        drawer=drawer,
+        order=order,
+        actor=courier,
+        event_type=LockerEventLog.EventType.PACKAGE_DEPOSITED,
+        metadata={"source": "courier_app_manual_confirmation"},
+    )
+    create_notification(
+        user=order.customer,
+        order=order,
+        notification_type=Notification.Type.ORDER_READY_FOR_PICKUP,
+        title="Order ready for pickup",
+        message=f"Your order is ready for pickup from {order.locker_station.name}.",
+        data={
+            "order_public_id": str(order.public_id),
+            "locker_code": order.locker_station.code,
+            "delivery_deadline": order.delivery_deadline.isoformat(),
+        },
+    )
+    create_audit_log(
+        actor=courier,
+        action=AuditLog.Action.ORDER_COURIER_PROGRESS_UPDATED,
+        target_type=AuditLog.TargetType.ORDER,
+        target_id=order.public_id,
+        metadata={"action": action, "source": "courier_app"},
+    )
+    return order
+
+
 def hash_qr_token(raw_token):
     return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
 

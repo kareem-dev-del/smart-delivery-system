@@ -5,9 +5,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter/services.dart';
 import 'package:shopease_mobile/core/routes/routes.dart';
 import 'package:shopease_mobile/core/theme/app_theme.dart';
+import 'package:shopease_mobile/core/utils/date_formatter.dart';
 import 'package:shopease_mobile/cubits/auth/auth_cubit.dart';
 import 'package:shopease_mobile/models/courier_order.dart';
 import 'package:shopease_mobile/models/app_user.dart';
+import 'package:shopease_mobile/models/order_tracking.dart';
 import 'package:shopease_mobile/services/courier_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -129,8 +131,32 @@ class _CourierHomeScreenState extends State<CourierHomeScreen> {
             isReturn: isReturn,
             onCopyAddress: _copyLockerAddress,
             onOpenDirections: _openDirections,
+            onAdvance: _advanceDelivery,
           ),
     );
+  }
+
+  Future<bool> _advanceDelivery(String orderId, String action) async {
+    try {
+      await widget.service.updateDeliveryProgress(
+        orderId: orderId,
+        action: action,
+      );
+      if (!mounted) return false;
+      Navigator.of(context).pop();
+      await _load(silent: true);
+      _showMessage(
+        action == 'picked_up'
+            ? 'Pickup confirmed. The customer can see the update.'
+            : 'Delivery confirmed. The order is ready for pickup.',
+      );
+      return true;
+    } catch (error) {
+      if (mounted) {
+        _showMessage(error.toString().replaceFirst('Exception: ', ''));
+      }
+      return false;
+    }
   }
 
   Future<void> _copyLockerAddress(String address) async {
@@ -589,22 +615,68 @@ class _OrderPanel extends StatelessWidget {
   };
 }
 
-class _CourierOrderDetailsSheet extends StatelessWidget {
+class _CourierOrderDetailsSheet extends StatefulWidget {
   const _CourierOrderDetailsSheet({
     required this.order,
     required this.isReturn,
     required this.onCopyAddress,
     required this.onOpenDirections,
+    required this.onAdvance,
   });
 
   final CourierOrder order;
   final bool isReturn;
   final ValueChanged<String> onCopyAddress;
   final ValueChanged<CourierOrder> onOpenDirections;
+  final Future<bool> Function(String orderId, String action) onAdvance;
+
+  @override
+  State<_CourierOrderDetailsSheet> createState() =>
+      _CourierOrderDetailsSheetState();
+}
+
+class _CourierOrderDetailsSheetState extends State<_CourierOrderDetailsSheet> {
+  bool _isUpdatingProgress = false;
+
+  Future<void> _confirmProgress(String action) async {
+    final isPickup = action == 'picked_up';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder:
+          (dialogContext) => AlertDialog(
+            title: Text(
+              isPickup
+                  ? 'Confirm package pickup?'
+                  : 'Confirm station delivery?',
+            ),
+            content: Text(
+              isPickup
+                  ? 'Confirm that you have received this package for delivery.'
+                  : 'Confirm that you placed this package in its assigned station. The customer will be notified.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('Confirm'),
+              ),
+            ],
+          ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _isUpdatingProgress = true);
+    await widget.onAdvance(widget.order.publicId, action);
+    if (mounted) setState(() => _isUpdatingProgress = false);
+  }
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final order = widget.order;
+    final isReturn = widget.isReturn;
     final address = order.lockerAddress;
 
     return DraggableScrollableSheet(
@@ -679,7 +751,7 @@ class _CourierOrderDetailsSheet extends StatelessWidget {
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(
-                    onPressed: () => onOpenDirections(order),
+                    onPressed: () => widget.onOpenDirections(order),
                     icon: const Icon(Icons.directions_rounded),
                     label: const Text('Open directions'),
                   ),
@@ -688,7 +760,7 @@ class _CourierOrderDetailsSheet extends StatelessWidget {
               if (address != null && address.trim().isNotEmpty) ...[
                 const SizedBox(height: 8),
                 OutlinedButton.icon(
-                  onPressed: () => onCopyAddress(address),
+                  onPressed: () => widget.onCopyAddress(address),
                   icon: const Icon(Icons.copy_rounded),
                   label: const Text('Copy locker address'),
                 ),
@@ -723,30 +795,70 @@ class _CourierOrderDetailsSheet extends StatelessWidget {
               const SizedBox(height: 22),
               _SectionHeading(title: 'Delivery steps', count: null),
               const SizedBox(height: 12),
-              _WorkflowStep(
-                title: 'Assigned to you',
-                subtitle: 'This task is in your active delivery list.',
-                isComplete: true,
-              ),
-              _WorkflowStep(
-                title:
-                    isReturn
-                        ? 'Return package to the locker'
-                        : 'Reach the locker station',
-                subtitle:
-                    isReturn
-                        ? 'Show the return task to the locker device.'
-                        : 'Bring the listed items to the assigned station and drawer.',
-                isComplete: false,
-              ),
-              if (!isReturn)
-                _WorkflowStep(
-                  title: 'Locker confirmation',
-                  subtitle:
-                      'The locker device confirms deposit and updates the order.',
-                  isComplete: false,
-                  isLast: true,
+              if (order.steps.isNotEmpty)
+                for (var i = 0; i < order.steps.length; i++)
+                  _CourierTimelineStep(
+                    step: order.steps[i],
+                    isLast: i == order.steps.length - 1,
+                  )
+              else ...[
+                const _WorkflowStep(
+                  title: 'Assigned to you',
+                  subtitle: 'This task is in your active delivery list.',
+                  isComplete: true,
                 ),
+                _WorkflowStep(
+                  title:
+                      isReturn
+                          ? 'Return package to the locker'
+                          : 'Reach the locker station',
+                  subtitle:
+                      isReturn
+                          ? 'Return the package to the assigned station.'
+                          : 'Bring the listed items to the assigned station and drawer.',
+                  isComplete: false,
+                ),
+              ],
+              if (!isReturn && order.status == 'assigned') ...[
+                const SizedBox(height: 16),
+                if (order.courierPickedUpAt == null)
+                  FilledButton.icon(
+                    onPressed:
+                        _isUpdatingProgress
+                            ? null
+                            : () => _confirmProgress('picked_up'),
+                    icon:
+                        _isUpdatingProgress
+                            ? const SizedBox.square(
+                              dimension: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                            : const Icon(Icons.inventory_2_outlined),
+                    label: const Text('Confirm package pickup'),
+                  )
+                else
+                  FilledButton.icon(
+                    onPressed:
+                        _isUpdatingProgress
+                            ? null
+                            : () => _confirmProgress('delivered_to_locker'),
+                    icon:
+                        _isUpdatingProgress
+                            ? const SizedBox.square(
+                              dimension: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                            : const Icon(Icons.check_circle_outline),
+                    label: const Text('Confirm placed at station'),
+                  ),
+                const SizedBox(height: 8),
+                Text(
+                  'These confirmations update the order in the app. Locker hardware is not connected yet.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: colors.mutedForeground,
+                  ),
+                ),
+              ],
             ],
           ),
     );
@@ -783,6 +895,85 @@ class _StatusBadge extends StatelessWidget {
           fontSize: 12,
           fontWeight: FontWeight.w700,
         ),
+      ),
+    );
+  }
+}
+
+class _CourierTimelineStep extends StatelessWidget {
+  const _CourierTimelineStep({required this.step, required this.isLast});
+
+  final TrackingStep step;
+  final bool isLast;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final active = step.isCompleted || step.isCurrent;
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            width: 22,
+            child: Column(
+              children: [
+                Icon(
+                  step.isCompleted
+                      ? Icons.check_circle
+                      : step.isCurrent
+                      ? Icons.radio_button_checked
+                      : Icons.circle_outlined,
+                  size: 18,
+                  color: active ? colors.primary : colors.mutedForeground,
+                ),
+                if (!isLast)
+                  Expanded(
+                    child: Container(
+                      width: 2,
+                      color: step.isCompleted ? colors.primary : colors.border,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    step.title,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: colors.foreground,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  if (step.description?.isNotEmpty == true) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      step.description!,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colors.mutedForeground,
+                      ),
+                    ),
+                  ],
+                  if (step.timestamp != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      DateFormatter.dateTime(step.timestamp),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colors.mutedForeground,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
