@@ -33,6 +33,7 @@ class OrderAdmin(admin.ModelAdmin):
         "created_at",
         "updated_at",
         "assigned_at",
+        "courier_picked_up_at",
         "ready_for_pickup_at",
         "collected_at",
         "return_opened_at",

@@ -13,6 +13,7 @@ from .views import (
     OrderCancellationAPIView,
     AdminOrderListAPIView,
     OrderTrackingAPIView,
+    CourierProgressUpdateAPIView,
 )
 
 
@@ -71,6 +72,11 @@ urlpatterns = [
     "courier/assignments/",
     CourierAssignmentListAPIView.as_view(),
     name="courier-assignment-list",
+    ),
+    path(
+        "<uuid:public_id>/courier-progress/",
+        CourierProgressUpdateAPIView.as_view(),
+        name="courier-progress-update",
     ),
 
     path(

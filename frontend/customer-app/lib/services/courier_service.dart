@@ -47,6 +47,17 @@ class CourierService {
     return value;
   }
 
+  Future<CourierOrder> updateDeliveryProgress({
+    required String orderId,
+    required String action,
+  }) async {
+    final response = await _client.post<Map<String, dynamic>>(
+      '/api/orders/$orderId/courier-progress/',
+      body: {'action': action},
+    );
+    return CourierOrder.fromJson(response);
+  }
+
   List<CourierOrder> _readOrders(dynamic response) {
     final rawList =
         response is List

@@ -16,6 +16,10 @@ class Notification(models.Model):
             "courier_assigned",
             "Courier Assigned",
         )
+        ORDER_COURIER_PICKED_UP = (
+            "order_courier_picked_up",
+            "Order Courier Picked Up",
+        )
         COURIER_RETURN_REQUIRED = (
             "courier_return_required",
             "Courier Return Required",

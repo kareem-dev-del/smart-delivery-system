@@ -548,6 +548,7 @@ Response item fields:
   "locker_longitude": "31.335220",
   "drawer_number": 1,
   "courier_assigned_at": "...",
+  "courier_picked_up_at": null,
   "assigned_at": "...",
   "created_at": "...",
   "items": [
@@ -559,6 +560,22 @@ Response item fields:
   ]
 }
 ```
+
+Courier assignment items also include the shared `steps` timeline. Couriers can
+record the two delivery confirmations from the app without a locker device:
+
+```http
+POST /api/orders/{public_id}/courier-progress/
+Authorization: Bearer <courier_access_token>
+Content-Type: application/json
+```
+
+Use `{"action":"picked_up"}` to record collection from dispatch, followed by
+`{"action":"delivered_to_locker"}` after placing the package in the assigned
+station. The second action marks the drawer occupied, the order ready for
+customer pickup, starts the pickup deadline, and notifies the customer. Only
+the courier assigned to that order can make these updates. These are manual app
+confirmations and do not communicate with or unlock locker hardware.
 
 ### 8.2 Return Orders
 
