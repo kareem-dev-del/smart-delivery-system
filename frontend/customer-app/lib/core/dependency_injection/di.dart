@@ -33,6 +33,7 @@ import 'package:shopease_mobile/services/cart_service.dart';
 import 'package:shopease_mobile/services/category_service.dart';
 import 'package:shopease_mobile/services/checkout_service.dart';
 import 'package:shopease_mobile/services/courier_service.dart';
+import 'package:shopease_mobile/services/push_notification_service.dart';
 import 'package:shopease_mobile/services/forgot_password_service.dart';
 import 'package:shopease_mobile/services/login_service.dart';
 import 'package:shopease_mobile/services/locker_station_service.dart';
@@ -138,6 +139,9 @@ class AppBlocProviders {
   static final CourierService courierService = CourierService(
     client: apiClient,
   );
+
+  static final PushNotificationService pushNotificationService =
+      PushNotificationService(client: apiClient);
 
   static final OrdersService ordersService = OrdersService(client: apiClient);
 
@@ -290,6 +294,7 @@ class AppBlocProviders {
             authController: authController,
             storageService: storageService,
             profileController: profileController,
+            pushNotificationService: pushNotificationService,
           )..restoreSession(),
     ),
     BlocProvider<CartCubit>(

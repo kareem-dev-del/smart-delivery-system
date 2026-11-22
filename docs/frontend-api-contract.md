@@ -913,6 +913,38 @@ Authorization: Bearer <admin_access_token>
 
 ### 9.9 Admin Notifications Monitoring
 
+Mobile apps register the signed-in user's current Firebase Messaging token:
+
+```http
+POST /api/notifications/devices/
+Authorization: Bearer <access_token>
+Content-Type: application/json
+```
+
+```json
+{ "token": "<FCM device token>", "platform": "android" }
+```
+
+Use `platform: "ios"` for Apple devices. On logout, remove that device token:
+
+```http
+DELETE /api/notifications/devices/?token=<FCM device token>
+Authorization: Bearer <access_token>
+```
+
+The API stores tokens per account. Notification creation queues an FCM send to
+each current device for that recipient, alongside the existing in-app record
+and email task. Invalid FCM tokens are removed. Backend sending is enabled by
+setting `FIREBASE_SERVICE_ACCOUNT_JSON` on the API and Celery worker services;
+the service account JSON must remain a deployment secret, never in the app or
+repository. Without this setting, FCM sends are skipped and the in-app inbox
+continues to work.
+
+Configure Firebase for Flutter with the official FlutterFire CLI and add the
+Android app using application ID `com.shopease.mobile.shopease_mobile`. The
+CLI-generated app configuration and Android `google-services.json` are needed
+before building an APK that receives push notifications.
+
 Screen: Admin notification delivery monitoring.
 
 ```http

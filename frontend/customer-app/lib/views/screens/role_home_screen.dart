@@ -1,3 +1,7 @@
+import 'dart:async';
+
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shopease_mobile/core/dependency_injection/di.dart';
@@ -19,14 +23,72 @@ class RoleHomeScreen extends StatelessWidget {
             body: Center(child: CircularProgressIndicator()),
           );
         }
-        if (state.user?.role == 'customer') return const MainScaffold();
+        if (state.user?.role == 'customer') {
+          return _PushRegistrationGate(
+            key: ValueKey(state.user!.id),
+            courierMode: false,
+            child: const MainScaffold(),
+          );
+        }
         if (state.user?.role == 'courier') {
-          return CourierHomeScreen(service: AppBlocProviders.courierService);
+          return _PushRegistrationGate(
+            key: ValueKey(state.user!.id),
+            courierMode: true,
+            child: CourierHomeScreen(service: AppBlocProviders.courierService),
+          );
         }
         return const _UnsupportedMobileRoleScreen();
       },
     );
   }
+}
+
+class _PushRegistrationGate extends StatefulWidget {
+  const _PushRegistrationGate({
+    super.key,
+    required this.courierMode,
+    required this.child,
+  });
+
+  final bool courierMode;
+  final Widget child;
+
+  @override
+  State<_PushRegistrationGate> createState() => _PushRegistrationGateState();
+}
+
+class _PushRegistrationGateState extends State<_PushRegistrationGate> {
+  StreamSubscription<RemoteMessage>? _openedSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    AppBlocProviders.pushNotificationService.registerCurrentDevice();
+    if (Firebase.apps.isNotEmpty) {
+      _openedSubscription = FirebaseMessaging.onMessageOpenedApp.listen(
+        (_) => _openInbox(),
+      );
+      FirebaseMessaging.instance.getInitialMessage().then((message) {
+        if (message != null) _openInbox();
+      });
+    }
+  }
+
+  void _openInbox() {
+    if (!mounted) return;
+    Navigator.of(
+      context,
+    ).pushNamed(AppRoutes.notifications, arguments: widget.courierMode);
+  }
+
+  @override
+  void dispose() {
+    _openedSubscription?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 class _UnsupportedMobileRoleScreen extends StatelessWidget {

@@ -3,8 +3,30 @@ from django.conf import settings
 from django.core.mail import send_mail
 from django.db import transaction
 from django.utils import timezone
+import json
+import logging
+import os
 
 from .models import Notification
+from .models import PushDevice
+
+logger = logging.getLogger(__name__)
+
+
+def _firebase_messaging():
+    service_account_json = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON", "").strip()
+    if not service_account_json:
+        return None
+
+    import firebase_admin
+    from firebase_admin import credentials, messaging
+
+    try:
+        app = firebase_admin.get_app("smartdrop-push")
+    except ValueError:
+        credential = credentials.Certificate(json.loads(service_account_json))
+        app = firebase_admin.initialize_app(credential, name="smartdrop-push")
+    return messaging, app
 
 
 def build_notification_email_message(notification):
@@ -88,4 +110,66 @@ def deliver_notification_email_task(self, notification_id):
             )
         )
 
+    return True
+
+
+@shared_task(bind=True)
+def deliver_notification_push_task(self, notification_id):
+    try:
+        notification = Notification.objects.select_related("user", "order").get(
+            id=notification_id
+        )
+    except Notification.DoesNotExist:
+        return False
+
+    firebase = _firebase_messaging()
+    if firebase is None:
+        logger.info("Skipping FCM delivery; Firebase service account is not configured.")
+        return False
+
+    messaging, app = firebase
+    tokens = list(
+        PushDevice.objects.filter(user=notification.user).values_list("id", "token")
+    )
+    if not tokens:
+        return False
+
+    data = {str(key): str(value) for key, value in notification.data.items()}
+    data.update(
+        {
+            "notification_id": str(notification.id),
+            "notification_type": notification.notification_type,
+            "role": notification.user.profile.role,
+        }
+    )
+    if notification.order_id:
+        data["order_public_id"] = str(notification.order.public_id)
+
+    stale_device_ids = []
+    for device_id, token in tokens:
+        try:
+            messaging.send(
+                messaging.Message(
+                    token=token,
+                    notification=messaging.Notification(
+                        title=notification.title,
+                        body=notification.message[:200],
+                    ),
+                    data=data,
+                    android=messaging.AndroidConfig(
+                        priority="high",
+                        notification=messaging.AndroidNotification(
+                            channel_id="smartdrop_order_updates"
+                        ),
+                    ),
+                ),
+                app=app,
+            )
+        except messaging.UnregisteredError:
+            stale_device_ids.append(device_id)
+        except Exception:
+            logger.exception("FCM delivery failed for notification %s", notification_id)
+
+    if stale_device_ids:
+        PushDevice.objects.filter(id__in=stale_device_ids).delete()
     return True

@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from .models import Notification
+from .models import PushDevice
 
 
 class NotificationSerializer(serializers.ModelSerializer):
@@ -35,6 +36,22 @@ class NotificationMarkAllReadResponseSerializer(serializers.Serializer):
 
 class NotificationListFilterSerializer(serializers.Serializer):
     unread = serializers.BooleanField(required=False)
+
+
+class PushDeviceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PushDevice
+        fields = ("token", "platform")
+
+    def validate_token(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("A device token is required.")
+        return value
+
+
+class PushDeviceDeleteSerializer(serializers.Serializer):
+    token = serializers.CharField(max_length=512, trim_whitespace=True)
 
 
 class AdminNotificationSerializer(NotificationSerializer):
