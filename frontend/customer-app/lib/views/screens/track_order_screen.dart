@@ -243,7 +243,7 @@ class _TrackOrderViewState extends State<_TrackOrderView> {
     'expired' => 'Pickup window expired',
     'cancelled' => 'Cancelled',
     'returned' => 'Returned to locker',
-    _ => status.replaceAll('_', ' '),
+    _ => tracking.status.replaceAll('_', ' '),
   };
 
   String _statusDescription(OrderTracking tracking) => switch (tracking

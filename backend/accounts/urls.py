@@ -6,6 +6,7 @@ from .views import (
     AdminCourierListAPIView,
     AdminCourierShiftAPIView,
     CourierSelfShiftAPIView,
+    CourierSelfLocationAPIView,
     ChangePasswordAPIView,
     CustomerRegistrationAPIView,
     LogoutAPIView,
@@ -38,6 +39,11 @@ urlpatterns = [
         "couriers/me/shift/",
         CourierSelfShiftAPIView.as_view(),
         name="courier-self-shift",
+    ),
+    path(
+        "couriers/me/location/",
+        CourierSelfLocationAPIView.as_view(),
+        name="courier-self-location",
     ),
     path(
         "register/",

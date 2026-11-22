@@ -1,9 +1,11 @@
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
+from django.conf import settings
 
 from .models import Notification
 from .tasks import deliver_notification_email_task
+from .tasks import deliver_notification_push_task
 
 
 def create_notification(
@@ -47,6 +49,10 @@ def create_notification(
     transaction.on_commit(
         lambda: deliver_notification_email_task.delay(notification.id)
     )
+    if settings.FIREBASE_SERVICE_ACCOUNT_JSON:
+        transaction.on_commit(
+            lambda: deliver_notification_push_task.delay(notification.id)
+        )
 
     return notification
 

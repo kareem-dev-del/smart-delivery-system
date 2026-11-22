@@ -25,6 +25,7 @@ from .serializers import (
     AdminManagedAccountCreateSerializer,
     AdminAccountStatusSerializer,
     AdminCourierShiftSerializer,
+    CourierLocationSerializer,
 )
 from .models import UserProfile
 from .permissions import IsAdminRole, IsCourier
@@ -261,9 +262,19 @@ class AdminCourierShiftAPIView(APIView):
         if previous_is_on_shift != next_is_on_shift:
             profile.is_on_shift = next_is_on_shift
             profile.shift_updated_at = timezone.now()
-            profile.save(
-                update_fields=("is_on_shift", "shift_updated_at", "updated_at")
-            )
+            update_fields = ["is_on_shift", "shift_updated_at", "updated_at"]
+            if not next_is_on_shift:
+                profile.courier_latitude = None
+                profile.courier_longitude = None
+                profile.courier_location_updated_at = None
+                update_fields.extend(
+                    [
+                        "courier_latitude",
+                        "courier_longitude",
+                        "courier_location_updated_at",
+                    ]
+                )
+            profile.save(update_fields=update_fields)
             create_audit_log(
                 actor=request.user,
                 action=AuditLog.Action.COURIER_SHIFT_CHANGED,
@@ -335,8 +346,19 @@ class CourierSelfShiftAPIView(APIView):
         if profile.is_on_shift != next_is_on_shift:
             profile.is_on_shift = next_is_on_shift
             profile.shift_updated_at = timezone.now()
+            if not next_is_on_shift:
+                profile.courier_latitude = None
+                profile.courier_longitude = None
+                profile.courier_location_updated_at = None
             profile.save(
-                update_fields=("is_on_shift", "shift_updated_at", "updated_at")
+                update_fields=(
+                    "is_on_shift",
+                    "shift_updated_at",
+                    "courier_latitude",
+                    "courier_longitude",
+                    "courier_location_updated_at",
+                    "updated_at",
+                )
             )
             create_audit_log(
                 actor=courier,
@@ -355,6 +377,42 @@ class CourierSelfShiftAPIView(APIView):
         ).get()
         return Response(
             AdminCourierSerializer(courier).data,
+            status=status.HTTP_200_OK,
+            headers={"Cache-Control": "no-store"},
+        )
+
+
+@extend_schema(
+    tags=["Courier"],
+    request=CourierLocationSerializer,
+    responses={status.HTTP_200_OK: AdminCourierSerializer},
+)
+class CourierSelfLocationAPIView(APIView):
+    permission_classes = [IsCourier]
+
+    def post(self, request):
+        serializer = CourierLocationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        profile = request.user.profile
+        if not request.user.is_active or not profile.is_on_shift:
+            return Response(
+                {"detail": "Start your shift before sharing your location."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        profile.courier_latitude = serializer.validated_data["latitude"]
+        profile.courier_longitude = serializer.validated_data["longitude"]
+        profile.courier_location_updated_at = timezone.now()
+        profile.save(
+            update_fields=(
+                "courier_latitude",
+                "courier_longitude",
+                "courier_location_updated_at",
+                "updated_at",
+            )
+        )
+        return Response(
+            {"location_updated_at": profile.courier_location_updated_at},
             status=status.HTTP_200_OK,
             headers={"Cache-Control": "no-store"},
         )

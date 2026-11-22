@@ -12,6 +12,7 @@ export interface AdminCourier {
   is_active: boolean;
   is_on_shift: boolean;
   shift_updated_at: string | null;
+  location_updated_at?: string | null;
   active_order_count: number;
   dispatch_status: "inactive" | "off_shift" | "busy" | "available";
 }

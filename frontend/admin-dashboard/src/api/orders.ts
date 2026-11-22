@@ -65,6 +65,9 @@ export interface CourierAssignment {
   courier_id: number;
   courier_username: string;
   courier_assigned_at: string;
+  distance_km?: number;
+  distance_method?: "straight_line";
+  location_updated_at?: string;
 }
 
 export function getAdminOrders(
@@ -99,6 +102,17 @@ export function assignCourierToOrder(
     `/api/orders/${publicId}/assign-courier/`,
     accessToken,
     { courier_id: courierId },
+  );
+}
+
+export function assignNearestCourierToOrder(
+  accessToken: string,
+  publicId: string,
+): Promise<CourierAssignment> {
+  return apiPost<CourierAssignment>(
+    `/api/orders/${publicId}/assign-nearest-courier/`,
+    accessToken,
+    {},
   );
 }
 

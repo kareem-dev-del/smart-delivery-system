@@ -65,6 +65,11 @@ class AdminCourierSerializer(AccountProfileSerializer):
     )
     active_order_count = serializers.IntegerField(read_only=True, default=0)
     dispatch_status = serializers.SerializerMethodField()
+    location_updated_at = serializers.DateTimeField(
+        source="profile.courier_location_updated_at",
+        read_only=True,
+        allow_null=True,
+    )
 
     class Meta(AccountProfileSerializer.Meta):
         fields = AccountProfileSerializer.Meta.fields + (
@@ -73,6 +78,7 @@ class AdminCourierSerializer(AccountProfileSerializer):
             "shift_updated_at",
             "active_order_count",
             "dispatch_status",
+            "location_updated_at",
         )
 
     def get_dispatch_status(self, obj) -> str:
@@ -176,6 +182,15 @@ class AdminAccountStatusSerializer(serializers.Serializer):
 
 class AdminCourierShiftSerializer(serializers.Serializer):
     is_on_shift = serializers.BooleanField()
+
+
+class CourierLocationSerializer(serializers.Serializer):
+    latitude = serializers.DecimalField(
+        max_digits=9, decimal_places=6, min_value=-90, max_value=90
+    )
+    longitude = serializers.DecimalField(
+        max_digits=9, decimal_places=6, min_value=-180, max_value=180
+    )
 
 
 class AuthenticationResponseSerializer(serializers.Serializer):

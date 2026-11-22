@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shopease_mobile/controllers/auth_controller.dart';
 import 'package:shopease_mobile/controllers/profile_controller.dart'; // [جديد]
 import 'package:shopease_mobile/services/local_storage_service.dart';
+import 'package:shopease_mobile/services/push_notification_service.dart';
 
 import 'auth_state.dart';
 
@@ -14,11 +15,13 @@ class AuthCubit extends Cubit<AuthState> {
     required this.authController,
     required this.storageService,
     required this.profileController, // [جديد]
+    required this.pushNotificationService,
   }) : super(const AuthState(isLoading: true));
 
   final AuthController authController;
   final LocalStorageService storageService;
   final ProfileController profileController; // [جديد]
+  final PushNotificationService pushNotificationService;
 
   Future<void> restoreSession() async {
     emit(state.copyWith(isLoading: true, clearError: true));
@@ -118,6 +121,11 @@ class AuthCubit extends Cubit<AuthState> {
   }
 
   Future<void> logout() async {
+    try {
+      await pushNotificationService.unregisterCurrentDevice();
+    } catch (_) {
+      // Local sign-out should still work when push services are unavailable.
+    }
     await authController.logout();
     await storageService.clearUser();
     emit(const AuthState(isLoading: false));

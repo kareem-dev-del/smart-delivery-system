@@ -16,6 +16,10 @@ class Notification(models.Model):
             "courier_assigned",
             "Courier Assigned",
         )
+        COURIER_ASSIGNMENT_CHANGED = (
+            "courier_assignment_changed",
+            "Courier Assignment Changed",
+        )
         ORDER_COURIER_PICKED_UP = (
             "order_courier_picked_up",
             "Order Courier Picked Up",
@@ -72,3 +76,27 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.notification_type}"
+
+
+class PushDevice(models.Model):
+    class Platform(models.TextChoices):
+        ANDROID = "android", "Android"
+        IOS = "ios", "iOS"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="push_devices",
+    )
+    token = models.CharField(max_length=512, unique=True)
+    platform = models.CharField(max_length=10, choices=Platform.choices)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["user", "platform"],
+                name="notif_push_userplat_idx",
+            )
+        ]

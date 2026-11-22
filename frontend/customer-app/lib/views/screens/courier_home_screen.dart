@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter/services.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:shopease_mobile/core/routes/routes.dart';
 import 'package:shopease_mobile/core/theme/app_theme.dart';
 import 'package:shopease_mobile/core/utils/date_formatter.dart';
@@ -30,7 +31,12 @@ class _CourierHomeScreenState extends State<CourierHomeScreen> {
   bool _isUpdatingShift = false;
   String? _error;
   Timer? _refreshTimer;
+  Timer? _locationTimer;
+  Timer? _notificationTimer;
   bool _loadInProgress = false;
+  bool _locationUploadInProgress = false;
+  int _unreadNotificationCount = 0;
+  DateTime? _lastLocationAttempt;
 
   @override
   void initState() {
@@ -38,6 +44,13 @@ class _CourierHomeScreenState extends State<CourierHomeScreen> {
     _load();
     _refreshTimer = Timer.periodic(const Duration(seconds: 15), (_) {
       if (mounted && !_loadInProgress) _load(silent: true);
+    });
+    _locationTimer = Timer.periodic(const Duration(seconds: 90), (_) {
+      if (mounted && _isOnShift) _sendCourierLocation();
+    });
+    _refreshUnreadNotifications();
+    _notificationTimer = Timer.periodic(const Duration(seconds: 45), (_) {
+      _refreshUnreadNotifications();
     });
   }
 
@@ -64,6 +77,12 @@ class _CourierHomeScreenState extends State<CourierHomeScreen> {
         _isLoading = false;
         _error = null;
       });
+      if (_isOnShift &&
+          (_lastLocationAttempt == null ||
+              DateTime.now().difference(_lastLocationAttempt!) >=
+                  const Duration(seconds: 90))) {
+        await _sendCourierLocation();
+      }
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -80,7 +99,20 @@ class _CourierHomeScreenState extends State<CourierHomeScreen> {
   @override
   void dispose() {
     _refreshTimer?.cancel();
+    _locationTimer?.cancel();
+    _notificationTimer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _refreshUnreadNotifications() async {
+    try {
+      final count = await widget.service.getUnreadNotificationCount();
+      if (mounted && count != _unreadNotificationCount) {
+        setState(() => _unreadNotificationCount = count);
+      }
+    } catch (_) {
+      // Keep the last count if the network is temporarily unavailable.
+    }
   }
 
   Future<void> _changeShift() async {
@@ -96,13 +128,65 @@ class _CourierHomeScreenState extends State<CourierHomeScreen> {
       if (!mounted) return;
       setState(() => _isOnShift = nextShift);
       _showMessage(
-        nextShift ? 'Your shift has started.' : 'Your shift has ended.',
+        nextShift
+            ? 'Your shift has started.'
+            : 'Your shift has ended. Your saved location was cleared.',
       );
+      if (nextShift) await _sendCourierLocation(showPermissionMessage: true);
     } catch (error) {
       if (!mounted) return;
       _showMessage(error.toString().replaceFirst('Exception: ', ''));
     } finally {
       if (mounted) setState(() => _isUpdatingShift = false);
+    }
+  }
+
+  Future<void> _sendCourierLocation({
+    bool showPermissionMessage = false,
+  }) async {
+    if (_locationUploadInProgress || !_isOnShift) return;
+    _locationUploadInProgress = true;
+    _lastLocationAttempt = DateTime.now();
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        if (showPermissionMessage && mounted) {
+          _showMessage(
+            'Enable location services to help assign nearby orders.',
+          );
+        }
+        return;
+      }
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        if (showPermissionMessage && mounted) {
+          _showMessage(
+            'Location permission is needed for nearest-courier assignment. You can still receive manually assigned orders.',
+          );
+        }
+        return;
+      }
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 12),
+        ),
+      );
+      await widget.service.updateLocation(
+        latitude: position.latitude,
+        longitude: position.longitude,
+      );
+    } catch (_) {
+      if (showPermissionMessage && mounted) {
+        _showMessage(
+          'Could not share your location. Manual assignment still works.',
+        );
+      }
+    } finally {
+      _locationUploadInProgress = false;
     }
   }
 
@@ -210,7 +294,17 @@ class _CourierHomeScreenState extends State<CourierHomeScreen> {
                 () => Navigator.of(
                   context,
                 ).pushNamed(AppRoutes.notifications, arguments: true),
-            icon: const Icon(Icons.notifications_outlined),
+            icon:
+                _unreadNotificationCount == 0
+                    ? const Icon(Icons.notifications_outlined)
+                    : Badge(
+                      label: Text(
+                        _unreadNotificationCount > 99
+                            ? '99+'
+                            : '$_unreadNotificationCount',
+                      ),
+                      child: const Icon(Icons.notifications_outlined),
+                    ),
           ),
           IconButton(
             tooltip: 'Refresh assignments',
@@ -385,6 +479,15 @@ class _ShiftPanel extends StatelessWidget {
               context,
             ).textTheme.bodySmall?.copyWith(color: colors.mutedForeground),
           ),
+          if (isOnShift) ...[
+            const SizedBox(height: 6),
+            Text(
+              'Your location is shared while this app is open during your shift to help match nearby orders. It is cleared when you end your shift.',
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: colors.mutedForeground),
+            ),
+          ],
           const SizedBox(height: 14),
           SizedBox(
             width: double.infinity,

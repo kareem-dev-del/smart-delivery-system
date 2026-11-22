@@ -5,10 +5,12 @@ from .views import (
     NotificationListAPIView,
     NotificationMarkAllReadAPIView,
     NotificationMarkReadAPIView,
+    PushDeviceAPIView,
 )
 
 
 urlpatterns = [
+    path("devices/", PushDeviceAPIView.as_view(), name="push-device"),
     path(
         "admin/",
         AdminNotificationListAPIView.as_view(),

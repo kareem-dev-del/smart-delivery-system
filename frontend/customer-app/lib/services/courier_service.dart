@@ -47,6 +47,30 @@ class CourierService {
     return value;
   }
 
+  Future<void> updateLocation({
+    required double latitude,
+    required double longitude,
+  }) async {
+    await _client.post<Map<String, dynamic>>(
+      '/api/accounts/couriers/me/location/',
+      body: {'latitude': latitude, 'longitude': longitude},
+    );
+  }
+
+  Future<int> getUnreadNotificationCount() async {
+    final response = await _client.get<dynamic>(
+      '/api/notifications/?unread=true&page_size=1',
+    );
+    if (response is Map<String, dynamic>) {
+      final count = response['count'];
+      if (count is int) return count;
+      final results = response['results'];
+      if (results is List) return results.length;
+    }
+    if (response is List) return response.length;
+    return 0;
+  }
+
   Future<CourierOrder> updateDeliveryProgress({
     required String orderId,
     required String action,

@@ -7,6 +7,7 @@ from .views import (
     OrderListCreateAPIView,
     OrderPickupQRAPIView,
     OrderCourierAssignmentAPIView,
+    OrderNearestCourierAssignmentAPIView,
     CourierReturnOrderListAPIView,
     OrderReturnQRAPIView,
     CourierAssignmentListAPIView,
@@ -55,6 +56,11 @@ urlpatterns = [
     "<uuid:public_id>/assign-courier/",
     OrderCourierAssignmentAPIView.as_view(),
     name="order-assign-courier",
+    ),
+    path(
+        "<uuid:public_id>/assign-nearest-courier/",
+        OrderNearestCourierAssignmentAPIView.as_view(),
+        name="order-assign-nearest-courier",
     ),
 
     path(

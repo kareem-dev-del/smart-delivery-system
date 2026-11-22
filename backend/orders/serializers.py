@@ -428,6 +428,9 @@ class OrderCourierAssignmentResponseSerializer(serializers.Serializer):
     courier_id = serializers.IntegerField(read_only=True)
     courier_username = serializers.CharField(read_only=True)
     courier_assigned_at = serializers.DateTimeField(read_only=True)  
+    distance_km = serializers.FloatField(read_only=True, required=False)
+    distance_method = serializers.CharField(read_only=True, required=False)
+    location_updated_at = serializers.DateTimeField(read_only=True, required=False)
 
 
 class AdminOrderListFilterSerializer(serializers.Serializer):

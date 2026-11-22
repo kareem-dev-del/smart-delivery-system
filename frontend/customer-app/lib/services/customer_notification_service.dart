@@ -6,6 +6,20 @@ class CustomerNotificationService {
 
   final ApiClient _client;
 
+  Future<int> getUnreadCount() async {
+    final response = await _client.get<dynamic>(
+      '/api/notifications/?unread=true&page_size=1',
+    );
+    if (response is Map<String, dynamic>) {
+      final count = response['count'];
+      if (count is int) return count;
+      final results = response['results'];
+      if (results is List) return results.length;
+    }
+    if (response is List) return response.length;
+    return 0;
+  }
+
   Future<List<CustomerNotification>> getNotifications() async {
     final response = await _client.get<dynamic>('/api/notifications/');
     final rawList =

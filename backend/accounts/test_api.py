@@ -191,6 +191,7 @@ class AdminCourierListAPIViewTests(APITestCase):
                     "shift_updated_at": None,
                     "active_order_count": 0,
                     "dispatch_status": "off_shift",
+                    "location_updated_at": None,
                 }
             ],
         )

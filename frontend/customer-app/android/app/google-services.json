@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "80100629139",
+    "project_id": "smartdrop-30c31",
+    "storage_bucket": "smartdrop-30c31.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:80100629139:android:e08e3085540814cd478b66",
+        "android_client_info": {
+          "package_name": "com.shopease.mobile.shopease_mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBDmsiiqoUsz496k9CeJ9sLlOL4evoe6-E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
