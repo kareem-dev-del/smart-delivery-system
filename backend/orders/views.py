@@ -487,13 +487,14 @@ class OrderCourierAssignmentAPIView(generics.GenericAPIView):
         )       
 
 
-@extend_schema(
-    tags=["Order Administration"],
-    responses={status.HTTP_200_OK: OrderCourierAssignmentResponseSerializer},
-)
 class OrderNearestCourierAssignmentAPIView(APIView):
     permission_classes = [IsAdminRole]
 
+    @extend_schema(
+        tags=["Order Administration"],
+        request=None,
+        responses={status.HTTP_200_OK: OrderCourierAssignmentResponseSerializer},
+    )
     def post(self, request, public_id):
         try:
             order, distance_km, location_updated_at = assign_nearest_courier_to_order(
