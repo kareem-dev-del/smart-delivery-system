@@ -706,3 +706,32 @@
   .orders-table-footer { align-items: flex-start; flex-direction: column; }
 }
 .orders-workspace { width: 100%; max-width: none; }
+
+.orders-heading-actions { display: flex; align-items: center; gap: 0.55rem; }
+.orders-plan-button, .orders-refresh-button { display: inline-flex; align-items: center; justify-content: center; gap: 0.45rem; }
+.orders-plan-button { min-height: 2.35rem; padding: 0.55rem 0.8rem; border: 1px solid var(--primary); border-radius: 0.5rem; background: var(--primary); color: #fff; font: inherit; font-size: 0.75rem; font-weight: 700; cursor: pointer; }
+.orders-plan-button:disabled, .orders-refresh-button:disabled { opacity: 0.58; cursor: wait; }
+.courier-plan-overlay { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 1rem; background: rgb(13 24 40 / 58%); }
+.courier-plan-dialog { display: flex; flex-direction: column; gap: 0.9rem; width: min(100%, 760px); max-height: min(88vh, 900px); overflow: hidden; padding: 1.2rem; border: 1px solid #e2e8f0; border-radius: 0.85rem; background: #fff; box-shadow: 0 24px 80px rgb(0 0 0 / 24%); }
+.courier-plan-dialog > header, .courier-plan-dialog > footer { display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; }
+.courier-plan-dialog > header h2 { margin: 0; color: #172b46; font-size: 1.15rem; }
+.courier-plan-dialog > header .eyebrow { margin: 0 0 0.25rem; }
+.courier-plan-dialog > header > button { width: 2rem; height: 2rem; border: 0; border-radius: 0.4rem; background: #f1f5f9; color: #334155; font-size: 1.4rem; cursor: pointer; }
+.courier-plan-explainer { margin: 0; color: #63748a; font-size: 0.78rem; line-height: 1.5; }
+.courier-plan-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.5rem; }
+.courier-plan-metrics > div { display: flex; flex-direction: column; gap: 0.25rem; padding: 0.7rem; border: 1px solid #e7edf4; border-radius: 0.55rem; }
+.courier-plan-metrics span, .courier-plan-list span { color: #75859a; font-size: 0.68rem; }
+.courier-plan-metrics strong { color: #203754; font-size: 1.05rem; }
+.courier-plan-list { display: flex; flex-direction: column; gap: 0.4rem; overflow: auto; min-height: 3rem; }
+.courier-plan-list article { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; padding: 0.7rem; border: 1px solid #e7edf4; border-radius: 0.5rem; }
+.courier-plan-list article > div { display: flex; flex-direction: column; gap: 0.22rem; min-width: 0; }
+.courier-plan-list article strong { color: #223954; font-size: 0.76rem; overflow-wrap: anywhere; }
+.courier-plan-list .courier-plan-unassigned { background: #fff8ed; border-color: #f3dfbf; }
+.courier-plan-dialog > footer { flex-wrap: wrap; padding-top: 0.35rem; }
+.courier-plan-dialog > footer > span { flex: 1 1 100%; color: #75859a; font-size: 0.65rem; }
+@media (max-width: 640px) {
+  .orders-heading-actions { flex-wrap: wrap; }
+  .courier-plan-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .courier-plan-list article { grid-template-columns: 1fr; }
+  .courier-plan-dialog { padding: 0.9rem; }
+}

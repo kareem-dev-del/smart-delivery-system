@@ -813,6 +813,54 @@ location is available, the API returns an actionable error and manual
 assignment remains available. Assignment creates in-app and configured email
 notifications for both the courier and customer.
 
+### 9.4.1 Batch courier assignment plan (admin)
+
+The admin dashboard can preview a proposed assignment for orders that are
+awaiting a courier and already have a locker station. The planner considers
+active, on-shift couriers with a location reported in the last five minutes
+and no other active delivery. Each courier and order can appear at most once.
+
+```http
+GET /api/orders/admin/courier-assignment-plan/
+Authorization: Bearer <admin_access_token>
+```
+
+The response contains candidate counts, proposed order/courier pairs,
+straight-line distance estimates, and orders that could not be assigned. The
+planner considers at most the oldest 100 eligible orders per preview and
+reports any additional candidates in `orders_deferred`; run another plan after
+applying the first batch to handle more. The
+objective is: assign as many eligible orders as possible, then minimize the
+sum of straight-line distances. This is a global match across the current
+batch, rather than independently choosing the nearest courier for each order.
+Distances use the courier's latest coordinates and locker coordinates. They
+do not account for roads, traffic, route order, carrying capacity, or arrival
+time.
+
+Previewing does not change orders. After reviewing the proposal, an admin can
+confirm it with:
+
+```http
+POST /api/orders/admin/courier-assignment-plan/
+Authorization: Bearer <admin_access_token>
+Content-Type: application/json
+```
+
+```json
+{
+  "assignments": [
+    { "order_public_id": "<order-uuid>", "courier_id": 3 }
+  ]
+}
+```
+
+Applying the plan rechecks the order, courier shift, recent location, and
+active workload inside one database transaction. If any proposal is stale,
+the operation is rejected and rolled back; refresh the preview before trying
+again. Successful assignments use the existing workflow, including its audit
+log and customer/courier notifications. The response contains `applied_count`
+and the assignments that were saved.
+
 ### 9.5 Assign Drawer
 
 ```http

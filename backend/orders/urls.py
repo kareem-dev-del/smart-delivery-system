@@ -15,11 +15,17 @@ from .views import (
     AdminOrderListAPIView,
     OrderTrackingAPIView,
     CourierProgressUpdateAPIView,
+    CourierAssignmentPlanAPIView,
 )
 
 
 urlpatterns = [
     path("", OrderListCreateAPIView.as_view(), name="order-list-create"),
+    path(
+        "admin/courier-assignment-plan/",
+        CourierAssignmentPlanAPIView.as_view(),
+        name="admin-courier-assignment-plan",
+    ),
     path(
     "<uuid:public_id>/cancel/",
     OrderCancellationAPIView.as_view(),

@@ -46,6 +46,9 @@ from .serializers import (
     OrderAdminReadSerializer,
     OrderTrackingSerializer,
     AdminOrderListFilterSerializer,
+    CourierAssignmentPlanApplySerializer,
+    CourierAssignmentPlanApplyResponseSerializer,
+    CourierAssignmentPlanSerializer,
 )
 from .services import (
     assign_order_to_drawer,
@@ -56,6 +59,8 @@ from .services import (
     issue_return_qr_token,
     cancel_order,
     update_courier_delivery_progress,
+    build_courier_assignment_plan,
+    apply_courier_assignment_plan,
 )
 
 
@@ -122,6 +127,40 @@ class AdminOrderListAPIView(generics.ListAPIView):
             queryset = queryset.filter(search_query)
 
         return queryset
+
+
+class CourierAssignmentPlanAPIView(APIView):
+    permission_classes = [IsAdminRole]
+
+    @extend_schema(
+        tags=["Order Administration"],
+        responses={status.HTTP_200_OK: CourierAssignmentPlanSerializer},
+    )
+    def get(self, request):
+        payload = build_courier_assignment_plan()
+        return Response(CourierAssignmentPlanSerializer(payload).data)
+
+    @extend_schema(
+        tags=["Order Administration"],
+        request=CourierAssignmentPlanApplySerializer,
+        responses={status.HTTP_200_OK: CourierAssignmentPlanApplyResponseSerializer},
+    )
+    def post(self, request):
+        serializer = CourierAssignmentPlanApplySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            applied = apply_courier_assignment_plan(
+                assignments=serializer.validated_data["assignments"],
+                actor=request.user,
+            )
+        except DjangoValidationError as error:
+            detail = getattr(error, "message_dict", {"detail": error.messages})
+            return Response(detail, status=status.HTTP_400_BAD_REQUEST)
+        payload = {"applied_count": len(applied), "assignments": applied}
+        return Response(
+            CourierAssignmentPlanApplyResponseSerializer(payload).data,
+            status=status.HTTP_200_OK,
+        )
 
 
 
