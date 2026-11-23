@@ -70,6 +70,27 @@ export interface CourierAssignment {
   location_updated_at?: string;
 }
 
+export interface CourierAssignmentPlanItem {
+  order_public_id: string;
+  customer_username: string;
+  locker_code: string;
+  courier_id: number;
+  courier_username: string;
+  distance_km: number;
+  location_updated_at: string;
+}
+
+export interface CourierAssignmentPlan {
+  orders_considered: number;
+  orders_deferred: number;
+  couriers_available: number;
+  assignment_count: number;
+  total_distance_km: number;
+  distance_method: "straight_line";
+  assignments: CourierAssignmentPlanItem[];
+  unassigned_orders: { order_public_id: string; reason: string }[];
+}
+
 export function getAdminOrders(
   accessToken: string,
   filters: { status?: string; search?: string; page?: number; pageSize?: number } = {},
@@ -113,6 +134,24 @@ export function assignNearestCourierToOrder(
     `/api/orders/${publicId}/assign-nearest-courier/`,
     accessToken,
     {},
+  );
+}
+
+export function getCourierAssignmentPlan(accessToken: string): Promise<CourierAssignmentPlan> {
+  return apiGet<CourierAssignmentPlan>(
+    "/api/orders/admin/courier-assignment-plan/",
+    accessToken,
+  );
+}
+
+export function applyCourierAssignmentPlan(
+  accessToken: string,
+  assignments: { order_public_id: string; courier_id: number }[],
+): Promise<{ applied_count: number; assignments: CourierAssignment[] }> {
+  return apiPost<{ applied_count: number; assignments: CourierAssignment[] }>(
+    "/api/orders/admin/courier-assignment-plan/",
+    accessToken,
+    { assignments },
   );
 }
 

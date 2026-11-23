@@ -6,14 +6,22 @@ import {
   ArrowRight,
   ClipboardList,
   ExternalLink,
+  LoaderCircle,
   Package,
+  Route,
   RefreshCw,
   Search,
   SlidersHorizontal,
 } from "lucide-react";
 
 import { getDashboardSummary, type DashboardSummary } from "../api/dashboard";
-import { getAdminOrders, type AdminOrder } from "../api/orders";
+import {
+  applyCourierAssignmentPlan,
+  getAdminOrders,
+  getCourierAssignmentPlan,
+  type AdminOrder,
+  type CourierAssignmentPlan,
+} from "../api/orders";
 import { useAuth } from "../auth/AuthProvider";
 import { formatDate, formatLabel } from "../lib/format";
 import { useLocale } from "../i18n/LocaleProvider";
@@ -55,6 +63,42 @@ export function OrdersPage() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [assignmentPlan, setAssignmentPlan] = useState<CourierAssignmentPlan | null>(null);
+  const [planLoading, setPlanLoading] = useState(false);
+  const [planApplying, setPlanApplying] = useState(false);
+  const [planMessage, setPlanMessage] = useState<string | null>(null);
+
+  async function previewCourierPlan() {
+    if (!tokens?.access) return;
+    setPlanLoading(true);
+    setPlanMessage(null);
+    try {
+      setAssignmentPlan(await getCourierAssignmentPlan(tokens.access));
+    } catch (caughtError) {
+      setPlanMessage(caughtError instanceof Error ? caughtError.message : t("Could not create assignment plan."));
+    } finally {
+      setPlanLoading(false);
+    }
+  }
+
+  async function confirmCourierPlan() {
+    if (!tokens?.access || !assignmentPlan) return;
+    setPlanApplying(true);
+    setPlanMessage(null);
+    try {
+      const result = await applyCourierAssignmentPlan(
+        tokens.access,
+        assignmentPlan.assignments.map(({ order_public_id, courier_id }) => ({ order_public_id, courier_id })),
+      );
+      setAssignmentPlan(null);
+      setPlanMessage(`${t("Assigned orders")}: ${result.applied_count}`);
+      await loadOrders(true);
+    } catch (caughtError) {
+      setPlanMessage(caughtError instanceof Error ? caughtError.message : t("Could not apply assignment plan."));
+    } finally {
+      setPlanApplying(false);
+    }
+  }
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -124,11 +168,19 @@ export function OrdersPage() {
           <h1 className="page-title">{t("Orders")}</h1>
           <p className="page-description">{t("Monitor every order moving through the SmartDrop network.")}</p>
         </div>
-        <button className="orders-refresh-button" type="button" onClick={() => void loadOrders()} disabled={loading}>
-          <RefreshCw size={15} className={loading ? "spin" : undefined} />
-          {t("Refresh")}
-        </button>
+        <div className="orders-heading-actions">
+          <button className="orders-plan-button" type="button" onClick={() => void previewCourierPlan()} disabled={planLoading || !tokens?.access}>
+            {planLoading ? <LoaderCircle size={15} className="spin" /> : <Route size={15} />}
+            {t("Plan courier assignments")}
+          </button>
+          <button className="orders-refresh-button" type="button" onClick={() => void loadOrders()} disabled={loading}>
+            <RefreshCw size={15} className={loading ? "spin" : undefined} />
+            {t("Refresh")}
+          </button>
+        </div>
       </header>
+
+      {planMessage && <div className="scope-note" role="status">{planMessage}</div>}
 
       {error && (
         <div className="scope-note error-note" role="alert">
@@ -242,6 +294,47 @@ export function OrdersPage() {
           </div>
         </footer>
       </section>
+
+      {assignmentPlan && (
+        <div className="courier-plan-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget && !planApplying) setAssignmentPlan(null); }}>
+          <section className="courier-plan-dialog" role="dialog" aria-modal="true" aria-labelledby="courier-plan-title">
+            <header>
+              <div><p className="eyebrow">{t("Operations research")}</p><h2 id="courier-plan-title">{t("Courier assignment plan")}</h2></div>
+              <button type="button" onClick={() => setAssignmentPlan(null)} disabled={planApplying} aria-label={t("Close")}>×</button>
+            </header>
+            <p className="courier-plan-explainer">{t("The plan assigns as many eligible orders as possible, then minimizes total straight-line distance. Review it before confirming.")}</p>
+            <div className="courier-plan-metrics">
+              <div><span>{t("Orders considered")}</span><strong>{assignmentPlan.orders_considered}</strong></div>
+              <div><span>{t("Available couriers")}</span><strong>{assignmentPlan.couriers_available}</strong></div>
+              <div><span>{t("Proposed assignments")}</span><strong>{assignmentPlan.assignment_count}</strong></div>
+              <div><span>{t("Approx. total distance")}</span><strong>{assignmentPlan.total_distance_km} km</strong></div>
+            </div>
+            {assignmentPlan.orders_deferred > 0 && <p className="courier-plan-deferred" role="status">{assignmentPlan.orders_deferred} {t("Additional orders deferred beyond the 100-order planning limit")}</p>}
+            <div className="courier-plan-list">
+              {assignmentPlan.assignments.map((item) => (
+                <article key={item.order_public_id}>
+                  <div><strong>#{item.order_public_id.slice(0, 8)} · {item.customer_username}</strong><span>{t("Locker")}: {item.locker_code}</span></div>
+                  <div><strong>{item.courier_username}</strong><span>{item.distance_km} km · {t("Location updated")}: {formatDate(item.location_updated_at)}</span></div>
+                </article>
+              ))}
+              {assignmentPlan.unassigned_orders.map((item) => (
+                <article className="courier-plan-unassigned" key={item.order_public_id}>
+                  <div><strong>#{item.order_public_id.slice(0, 8)}</strong><span>{t(item.reason)}</span></div>
+                  <strong>{t("Not assigned")}</strong>
+                </article>
+              ))}
+              {assignmentPlan.assignment_count === 0 && <p>{t("No eligible order and courier pairs were found.")}</p>}
+            </div>
+            <footer>
+              <span>{t("Straight-line distance is an estimate, not road travel distance or an ETA.")}</span>
+              <button type="button" className="orders-refresh-button" onClick={() => setAssignmentPlan(null)} disabled={planApplying}>{t("Cancel")}</button>
+              <button type="button" className="orders-plan-button" onClick={() => void confirmCourierPlan()} disabled={planApplying || assignmentPlan.assignment_count === 0}>
+                {planApplying && <LoaderCircle size={15} className="spin" />}{planApplying ? t("Applying...") : t("Confirm assignments")}
+              </button>
+            </footer>
+          </section>
+        </div>
+      )}
     </div>
   );
 }

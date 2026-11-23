@@ -79,6 +79,69 @@ class OrderTrackingStepSerializer(serializers.Serializer):
     isCurrent = serializers.BooleanField()
 
 
+class CourierAssignmentPlanItemSerializer(serializers.Serializer):
+    order_public_id = serializers.UUIDField()
+    courier_id = serializers.IntegerField(min_value=1)
+
+
+class CourierAssignmentPlanApplySerializer(serializers.Serializer):
+    assignments = CourierAssignmentPlanItemSerializer(many=True, allow_empty=False)
+
+    def validate_assignments(self, assignments):
+        order_ids = [item["order_public_id"] for item in assignments]
+        courier_ids = [item["courier_id"] for item in assignments]
+        if len(order_ids) != len(set(order_ids)):
+            raise serializers.ValidationError("Each order can appear only once.")
+        if len(courier_ids) != len(set(courier_ids)):
+            raise serializers.ValidationError("Each courier can appear only once.")
+        if len(assignments) > 100:
+            raise serializers.ValidationError("A plan can contain at most 100 assignments.")
+        return assignments
+
+
+class CourierAssignmentPlanAssignmentSerializer(serializers.Serializer):
+    order_public_id = serializers.UUIDField()
+    customer_username = serializers.CharField()
+    locker_code = serializers.CharField()
+    courier_id = serializers.IntegerField()
+    courier_username = serializers.CharField()
+    distance_km = serializers.FloatField()
+    location_updated_at = serializers.DateTimeField()
+
+
+class CourierAssignmentPlanUnassignedSerializer(serializers.Serializer):
+    order_public_id = serializers.UUIDField()
+    reason = serializers.ChoiceField(choices=(
+        "locker_not_assigned", "no_eligible_courier", "no_unique_courier_remaining"
+    ))
+
+
+class CourierAssignmentPlanSerializer(serializers.Serializer):
+    orders_considered = serializers.IntegerField()
+    orders_deferred = serializers.IntegerField()
+    couriers_available = serializers.IntegerField()
+    assignment_count = serializers.IntegerField()
+    total_distance_km = serializers.FloatField()
+    distance_method = serializers.ChoiceField(choices=("straight_line",))
+    assignments = CourierAssignmentPlanAssignmentSerializer(many=True)
+    unassigned_orders = CourierAssignmentPlanUnassignedSerializer(many=True)
+
+
+class CourierAssignmentPlanAppliedItemSerializer(serializers.Serializer):
+    order_public_id = serializers.UUIDField()
+    courier_id = serializers.IntegerField()
+    courier_username = serializers.CharField()
+    courier_assigned_at = serializers.DateTimeField()
+    distance_km = serializers.FloatField()
+    distance_method = serializers.ChoiceField(choices=("straight_line",))
+    location_updated_at = serializers.DateTimeField()
+
+
+class CourierAssignmentPlanApplyResponseSerializer(serializers.Serializer):
+    applied_count = serializers.IntegerField()
+    assignments = CourierAssignmentPlanAppliedItemSerializer(many=True)
+
+
 class OrderReadSerializer(serializers.ModelSerializer):
     items = OrderItemReadSerializer(many=True, read_only=True)
     steps = serializers.SerializerMethodField()

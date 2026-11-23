@@ -950,6 +950,23 @@ Status codes:
 404 Not Found
 ```
 
+### 10.1.1 Preview and apply a courier assignment plan
+
+```http
+GET /api/orders/admin/courier-assignment-plan/
+POST /api/orders/admin/courier-assignment-plan/
+```
+
+Admin only. `GET` previews matching orders awaiting a courier with eligible
+on-shift couriers reporting a recent location. It maximizes the number of
+assignments first, then minimizes total straight-line distance. The preview
+does not write to the database. `POST` accepts reviewed `{order_public_id,
+courier_id}` pairs and applies them atomically after rechecking eligibility.
+Each order and courier may appear once. A stale proposal fails as a whole;
+the admin must refresh and review a new preview. Straight-line distance is not
+road distance or an ETA. See `frontend-api-contract.md` for request and
+response examples.
+
 ---
 
 ### 10.2 Emergency Open Drawer

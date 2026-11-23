@@ -1,5 +1,6 @@
 from datetime import timedelta
 from decimal import Decimal
+from heapq import heappop, heappush
 from math import asin, cos, radians, sin, sqrt
 
 from django.core.exceptions import ValidationError
@@ -1351,6 +1352,285 @@ def assign_nearest_courier_to_order(*, order_public_id, actor=None, now=None):
         actor=actor,
     )
     return assigned_order, distance_km, courier.profile.courier_location_updated_at
+
+
+def _add_flow_edge(graph, start, end, capacity, cost):
+    forward = [end, len(graph[end]), capacity, cost]
+    reverse = [start, len(graph[start]), 0, -cost]
+    graph[start].append(forward)
+    graph[end].append(reverse)
+
+
+def _minimum_cost_maximum_courier_matching(orders, couriers):
+    """Maximize assigned orders, then minimize total straight-line distance."""
+    order_count = len(orders)
+    courier_count = len(couriers)
+    source = 0
+    order_start = 1
+    courier_start = order_start + order_count
+    sink = courier_start + courier_count
+    graph = [[] for _ in range(sink + 1)]
+
+    for order_index in range(order_count):
+        _add_flow_edge(graph, source, order_start + order_index, 1, 0)
+    for courier_index in range(courier_count):
+        _add_flow_edge(graph, courier_start + courier_index, sink, 1, 0)
+
+    assignment_edges = {}
+    distances = {}
+    for order_index, order in enumerate(orders):
+        station = order.locker_station
+        for courier_index, courier in enumerate(couriers):
+            distance_km = _distance_km(
+                courier.profile.courier_latitude,
+                courier.profile.courier_longitude,
+                station.latitude,
+                station.longitude,
+            )
+            # Integer meters keep the residual-network costs deterministic.
+            cost_meters = round(distance_km * 1000)
+            node = order_start + order_index
+            edge_index = len(graph[node])
+            _add_flow_edge(
+                graph,
+                node,
+                courier_start + courier_index,
+                1,
+                cost_meters,
+            )
+            assignment_edges[(order_index, courier_index)] = (node, edge_index)
+            distances[(order_index, courier_index)] = distance_km
+
+    # Successive shortest augmenting paths with node potentials. Continuing
+    # until no path remains first maximizes assignment count; shortest paths
+    # then minimize distance for that maximum count.
+    potentials = [0] * len(graph)
+    while True:
+        shortest = [None] * len(graph)
+        previous = [None] * len(graph)
+        shortest[source] = 0
+        queue = [(0, source)]
+
+        while queue:
+            distance, node = heappop(queue)
+            if distance != shortest[node]:
+                continue
+            for edge_index, edge in enumerate(graph[node]):
+                target, _, capacity, cost = edge
+                if capacity <= 0:
+                    continue
+                reduced_cost = cost + potentials[node] - potentials[target]
+                candidate = distance + reduced_cost
+                if shortest[target] is None or candidate < shortest[target]:
+                    shortest[target] = candidate
+                    previous[target] = (node, edge_index)
+                    heappush(queue, (candidate, target))
+
+        if shortest[sink] is None:
+            break
+
+        for node, distance in enumerate(shortest):
+            if distance is not None:
+                potentials[node] += distance
+
+        node = sink
+        while node != source:
+            previous_node, edge_index = previous[node]
+            edge = graph[previous_node][edge_index]
+            edge[2] -= 1
+            graph[node][edge[1]][2] += 1
+            node = previous_node
+
+    matching = []
+    for pair, (node, edge_index) in assignment_edges.items():
+        if graph[node][edge_index][2] == 0:
+            order_index, courier_index = pair
+            matching.append(
+                (order_index, courier_index, distances[pair])
+            )
+    return matching
+
+
+def build_courier_assignment_plan(*, now=None):
+    now = now or timezone.now()
+    order_queryset = Order.objects.filter(
+        status__in=(Order.Status.AWAITING_LOCKER, Order.Status.ASSIGNED),
+        assigned_courier__isnull=True,
+    )
+    total_candidate_orders = order_queryset.count()
+    candidate_orders = list(
+        order_queryset
+        .select_related("customer", "locker_station")
+        .order_by("created_at", "public_id")
+        [:100]
+    )
+    orders = [order for order in candidate_orders if order.locker_station_id]
+    orders_without_locker = [
+        order for order in candidate_orders if not order.locker_station_id
+    ]
+
+    active_statuses = (
+        Order.Status.AWAITING_LOCKER,
+        Order.Status.ASSIGNED,
+        Order.Status.EXPIRED,
+    )
+    other_active_orders = Order.objects.filter(
+        assigned_courier_id=OuterRef("pk"),
+        status__in=active_statuses,
+    )
+    couriers = list(
+        User.objects.filter(
+            is_active=True,
+            profile__role=UserProfile.Role.COURIER,
+            profile__is_on_shift=True,
+            profile__courier_latitude__isnull=False,
+            profile__courier_longitude__isnull=False,
+            profile__courier_location_updated_at__gte=(
+                now - COURIER_LOCATION_MAX_AGE
+            ),
+        )
+        .annotate(has_active_order=Exists(other_active_orders))
+        .filter(has_active_order=False)
+        .select_related("profile")
+        .order_by("username", "id")
+    )
+
+    matching = _minimum_cost_maximum_courier_matching(orders, couriers)
+    matched_order_indexes = {order_index for order_index, _, _ in matching}
+    matched_orders = []
+    for order_index, courier_index, distance_km in matching:
+        order = orders[order_index]
+        courier = couriers[courier_index]
+        matched_orders.append(
+            {
+                "order_public_id": order.public_id,
+                "customer_username": order.customer.username,
+                "locker_code": order.locker_station.code,
+                "courier_id": courier.id,
+                "courier_username": courier.username,
+                "distance_km": round(distance_km, 2),
+                "location_updated_at": (
+                    courier.profile.courier_location_updated_at
+                ),
+            }
+        )
+
+    unmatched = [
+        {
+            "order_public_id": order.public_id,
+            "reason": "locker_not_assigned",
+        }
+        for order in orders_without_locker
+    ]
+    unmatched.extend(
+        {
+            "order_public_id": order.public_id,
+            "reason": (
+                "no_eligible_courier"
+                if not couriers
+                else "no_unique_courier_remaining"
+            ),
+        }
+        for index, order in enumerate(orders)
+        if index not in matched_order_indexes
+    )
+
+    return {
+        "orders_considered": len(candidate_orders),
+        "orders_deferred": max(0, total_candidate_orders - len(candidate_orders)),
+        "couriers_available": len(couriers),
+        "assignment_count": len(matched_orders),
+        "total_distance_km": round(
+            sum(item[2] for item in matching), 2
+        ),
+        "distance_method": "straight_line",
+        "assignments": matched_orders,
+        "unassigned_orders": unmatched,
+    }
+
+
+@transaction.atomic
+def apply_courier_assignment_plan(*, assignments, actor=None, now=None):
+    now = now or timezone.now()
+    applied = []
+    for item in assignments:
+        try:
+            order = (
+                Order.objects.select_for_update(of=("self",))
+                .select_related("locker_station")
+                .get(public_id=item["order_public_id"])
+            )
+        except Order.DoesNotExist as error:
+            raise ValidationError(
+                {"order_public_id": "An order in this plan no longer exists."}
+            ) from error
+
+        if (
+            order.status not in (Order.Status.AWAITING_LOCKER, Order.Status.ASSIGNED)
+            or order.assigned_courier_id is not None
+            or order.locker_station_id is None
+        ):
+            raise ValidationError(
+                {
+                    "assignments": (
+                        "The plan is out of date. Refresh it before applying."
+                    )
+                }
+            )
+
+        try:
+            courier = (
+                User.objects.select_for_update(of=("self",))
+                .select_related("profile")
+                .get(pk=item["courier_id"])
+            )
+        except User.DoesNotExist as error:
+            raise ValidationError(
+                {"courier_id": "A courier in this plan no longer exists."}
+            ) from error
+
+        profile = UserProfile.objects.select_for_update().filter(user_id=courier.id).first()
+        if (
+            profile is None
+            or not courier.is_active
+            or profile.role != UserProfile.Role.COURIER
+            or not profile.is_on_shift
+            or profile.courier_latitude is None
+            or profile.courier_longitude is None
+            or profile.courier_location_updated_at is None
+            or profile.courier_location_updated_at < now - COURIER_LOCATION_MAX_AGE
+        ):
+            raise ValidationError(
+                {
+                    "assignments": (
+                        "A courier is no longer eligible. Refresh the plan."
+                    )
+                }
+            )
+
+        distance_km = _distance_km(
+            profile.courier_latitude,
+            profile.courier_longitude,
+            order.locker_station.latitude,
+            order.locker_station.longitude,
+        )
+        assigned_order = assign_courier_to_order(
+            order_public_id=order.public_id,
+            courier_id=courier.id,
+            actor=actor,
+        )
+        applied.append(
+            {
+                "order_public_id": assigned_order.public_id,
+                "courier_id": courier.id,
+                "courier_username": courier.username,
+                "courier_assigned_at": assigned_order.courier_assigned_at,
+                "distance_km": round(distance_km, 2),
+                "distance_method": "straight_line",
+                "location_updated_at": profile.courier_location_updated_at,
+            }
+        )
+    return applied
 
 
 @transaction.atomic
