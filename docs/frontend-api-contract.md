@@ -347,8 +347,9 @@ Response main fields:
 
 Before submitting, the customer app requests eligible pickup stations for the
 products in the cart. The backend filters online stations with an available
-drawer large enough for the largest item and sorts them by distance when a
-location is supplied:
+drawer large enough for the largest item and ranks them using distance (when
+provided), compatible free-drawer capacity, and whether the device sent a
+heartbeat in the last two minutes:
 
 ```http
 GET /api/lockers/nearby/?product_ids=1,2&latitude=29.960235&longitude=31.256537
@@ -791,6 +792,32 @@ Eligible pickup stations for a customer's cart:
 GET /api/lockers/nearby/?product_ids=1,2&latitude=29.960235&longitude=31.256537
 Authorization: Bearer <customer_access_token>
 ```
+
+The API excludes offline stations and stations without an available drawer
+large enough for the cart. Results are ordered by an explainable prototype
+score: proximity 50%, compatible free-drawer capacity 30%, and an active device
+heartbeat within the last two minutes 20%. If location is unavailable, the
+proximity component is neutral. A stale or missing device heartbeat is shown
+as unconfirmed and lowers the score; it does not make the station appear
+hardware-ready. Each result adds `recommendation_score` (0–100),
+`recommendation_reasons` (human-readable reasons), and `device_ready`.
+These weights are prototype heuristics, not a trained prediction model.
+
+Admin-only read-only Gemini operations assistant:
+
+```http
+POST /api/lockers/admin/operations-assistant/
+Authorization: Bearer <admin_access_token>
+Content-Type: application/json
+
+{"question":"Which online stations have the least available capacity?"}
+```
+
+The response contains `answer`, `evidence` from fixed database-backed tools,
+and `model`. Only aggregate order/station details or a requested order's
+operational state are sent to Gemini; customer identity and contact fields are
+excluded. Configure `GEMINI_API_KEY` on the backend only. The assistant is
+read-only and rate-limited.
 
 Locker detail:
 

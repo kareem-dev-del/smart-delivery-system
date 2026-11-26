@@ -11,6 +11,8 @@ import {
   LogOut,
   Menu,
   Monitor,
+  Cpu,
+  Sparkles,
   Package,
   ShieldCheck,
   UserRound,
@@ -39,6 +41,8 @@ export function AppLayout() {
     { label: "My profile", to: "/profile", icon: UserRound, badge: null },
     { label: "Lockers", to: "/lockers", icon: Boxes, badge: null },
     { label: "Devices", to: "/devices", icon: Monitor, badge: null },
+    { label: "Locker simulator", to: "/locker-simulator", icon: Cpu, badge: null },
+    { label: "Operations assistant", to: "/operations-assistant", icon: Sparkles, badge: null },
     { label: "Notifications", to: "/notifications", icon: Bell, badge: null },
     { label: "Audit Log", to: "/audit-log", icon: FileClock, badge: null },
   ];

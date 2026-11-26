@@ -102,8 +102,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                 const SizedBox(height: 6),
                                 Text(
                                   _usedDeviceLocation
-                                      ? 'Available lockers are sorted by distance from your current location.'
-                                      : 'Choose an eligible locker. Allow location access to sort the list by distance.',
+                                      ? 'Eligible lockers are ranked by distance, compatible drawer capacity, and recent device check-ins.'
+                                      : 'Location is unavailable. Lockers are ranked by compatible capacity and recent device check-ins.',
                                   style: TextStyle(
                                       color: context.colors.mutedForeground),
                                 ),
@@ -156,21 +156,39 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                           color: context.colors.mutedForeground),
                                     ),
                                   ),
-                                for (final station in _stations)
-                                  Card(
-                                    margin: const EdgeInsets.only(top: 8),
-                                    child: RadioListTile<int>(
-                                      value: station.id,
-                                      groupValue: _selectedStation?.id,
-                                      onChanged: (value) => setState(() {
-                                        _selectedStation = station;
-                                      }),
-                                      title: Text(station.name),
-                                      subtitle: Text(
-                                        '${station.address}\n${station.distanceKm == null ? 'Distance unavailable' : '${station.distanceKm!.toStringAsFixed(1)} km away'} · ${station.availableDrawersCount} compatible drawer${station.availableDrawersCount == 1 ? '' : 's'} available',
-                                        maxLines: 3,
-                                      ),
-                                      isThreeLine: true,
+                                if (_stations.isNotEmpty)
+                                  RadioGroup<int>(
+                                    groupValue: _selectedStation?.id,
+                                    onChanged: (value) {
+                                      final matches = _stations
+                                          .where((item) => item.id == value);
+                                      if (matches.isNotEmpty) {
+                                        setState(() {
+                                          _selectedStation = matches.first;
+                                        });
+                                      }
+                                    },
+                                    child: Column(
+                                      children: [
+                                        for (var index = 0;
+                                            index < _stations.length;
+                                            index++)
+                                          Card(
+                                            margin:
+                                                const EdgeInsets.only(top: 8),
+                                            child: RadioListTile<int>(
+                                              value: _stations[index].id,
+                                              title: Text(
+                                                '${_stations[index].name} · ${_stations.length == 1 ? 'Only eligible locker' : index == 0 ? 'Recommended' : 'Alternative'}',
+                                              ),
+                                              subtitle: Text(
+                                                '${_stations[index].address}\n${_stations[index].distanceKm == null ? 'Distance unavailable' : '${_stations[index].distanceKm!.toStringAsFixed(1)} km away'} · ${_stations[index].availableDrawersCount} compatible drawer${_stations[index].availableDrawersCount == 1 ? '' : 's'}\nRecommendation score: ${_stations[index].recommendationScore}/100\n${_stations[index].deviceReady ? 'Locker device checked in recently' : 'No recent locker-device check-in'}',
+                                                maxLines: 6,
+                                              ),
+                                              isThreeLine: true,
+                                            ),
+                                          ),
+                                      ],
                                     ),
                                   ),
                                 const SizedBox(height: 22),

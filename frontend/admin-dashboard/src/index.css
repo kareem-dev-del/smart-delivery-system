@@ -5,6 +5,8 @@
 @import './styles/operations.css';
 @import './styles/lockers.css';
 @import './styles/devices.css';
+@import './styles/locker-simulator.css';
+@import './styles/operations-assistant.css';
 @import './styles/products.css';
 @import './styles/categories.css';
 @import './styles/people.css';

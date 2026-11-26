@@ -1,9 +1,8 @@
-name: smart-delivery
+name: smartdrop-contest
 
 services:
   db:
     image: postgres:17
-    container_name: smart-delivery-postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
@@ -12,7 +11,7 @@ services:
     volumes:
       - smart_delivery_postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "5433:5432"
     healthcheck:
       test:
         [
@@ -26,7 +25,6 @@ services:
 
   redis:
     image: redis:8.10.2-alpine
-    container_name: smart-delivery-redis
     restart: unless-stopped
     command: ["redis-server", "--save", "", "--appendonly", "no"]
     healthcheck:
@@ -38,7 +36,6 @@ services:
   web:
     build:
       context: .
-    container_name: smart-delivery-web
     command: >
       sh -c "python manage.py migrate &&
       python manage.py runserver 0.0.0.0:8000"
@@ -52,7 +49,7 @@ services:
       - .:/app
       - smart_delivery_media:/app/media
     ports:
-      - "8000:8000"
+      - "8010:8000"
     healthcheck:
       test:
         [
@@ -75,7 +72,6 @@ services:
   celery-worker:
     build:
       context: .
-    container_name: smart-delivery-celery-worker
     command: celery -A config worker --loglevel=INFO --concurrency=1
     env_file:
       - .env
@@ -97,7 +93,6 @@ services:
   celery-beat:
     build:
       context: .
-    container_name: smart-delivery-celery-beat
     command: celery -A config beat --loglevel=INFO --schedule=/tmp/celerybeat-schedule --pidfile=/tmp/celerybeat.pid
     env_file:
       - .env
@@ -117,5 +112,3 @@ services:
 volumes:
   smart_delivery_media:
   smart_delivery_postgres_data:
-    external: true
-    name: smart_delivery_postgres_data

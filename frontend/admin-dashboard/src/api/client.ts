@@ -10,6 +10,7 @@ interface ApiRequestOptions {
   accessToken: string;
   method?: ApiMethod;
   body?: unknown;
+  headers?: Record<string, string>;
 }
 
 export class ApiRequestError extends Error {
@@ -55,6 +56,7 @@ export async function apiRequest<T>(
     headers: {
       Authorization: `Bearer ${options.accessToken}`,
       ...(isMultipart ? {} : { "Content-Type": "application/json" }),
+      ...options.headers,
     },
     body: requestBody,
   });

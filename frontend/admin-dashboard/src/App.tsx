@@ -4,6 +4,8 @@ import { AppLayout } from './components/AppLayout';
 import { AdminRoute, ProtectedRoute } from './components/ProtectedRoute';
 import { AccessDeniedPage } from './pages/AccessDeniedPage';
 import { DevicesPage } from './pages/DevicesPage';
+import { OperationsAssistantPage } from './pages/OperationsAssistantPage';
+import { LockerSimulatorPage } from './pages/LockerSimulatorPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
 import { NotFoundPage } from './pages/NotFoundPage';
@@ -45,6 +47,8 @@ function App() {
                 <Route path="/orders/:publicId" element={<OrderDetailsPage />} />
                 <Route path="/lockers" element={<LockersPage />} />
                 <Route path="/devices" element={<DevicesPage />} />
+                <Route path="/locker-simulator" element={<LockerSimulatorPage />} />
+                <Route path="/operations-assistant" element={<OperationsAssistantPage />} />
                 <Route path="/notifications" element={<NotificationsPage />} />
                 <Route path="/audit-log" element={<AuditLogPage />} />
               </Route>

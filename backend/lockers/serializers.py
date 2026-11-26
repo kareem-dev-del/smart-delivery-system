@@ -29,6 +29,21 @@ class DrawerMaintenanceStatusSerializer(serializers.Serializer):
         )
     )
 
+
+class OperationsAssistantRequestSerializer(serializers.Serializer):
+    question = serializers.CharField(min_length=5, max_length=500, trim_whitespace=True)
+
+
+class OperationsAssistantEvidenceSerializer(serializers.Serializer):
+    tool = serializers.CharField()
+    data = serializers.DictField()
+
+
+class OperationsAssistantResponseSerializer(serializers.Serializer):
+    answer = serializers.CharField()
+    evidence = OperationsAssistantEvidenceSerializer(many=True)
+    model = serializers.CharField()
+
 class LockerDeviceProvisionSerializer(serializers.Serializer):
     device_code = serializers.CharField(max_length=100)
 
@@ -135,6 +150,9 @@ class NearbyLockerQuerySerializer(serializers.Serializer):
 class NearbyLockerSerializer(serializers.ModelSerializer):
     distance_km = serializers.FloatField(allow_null=True)
     available_drawers_count = serializers.IntegerField()
+    recommendation_score = serializers.IntegerField()
+    recommendation_reasons = serializers.ListField(child=serializers.CharField())
+    device_ready = serializers.BooleanField()
 
     class Meta:
         model = LockerStation
@@ -147,6 +165,9 @@ class NearbyLockerSerializer(serializers.ModelSerializer):
             "longitude",
             "distance_km",
             "available_drawers_count",
+            "recommendation_score",
+            "recommendation_reasons",
+            "device_ready",
         )
 class AdminLockerStationWriteSerializer(serializers.ModelSerializer):
     code = serializers.CharField(max_length=50)

@@ -16,6 +16,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from pathlib import Path
+from corsheaders.defaults import default_headers
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -32,6 +33,9 @@ if not SECRET_KEY:
     raise RuntimeError("SECRET_KEY is not set")
 
 DEBUG = os.getenv("DEBUG", "False").lower() == "true"
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
+GEMINI_TIMEOUT_SECONDS = int(os.getenv("GEMINI_TIMEOUT_SECONDS", "30"))
 
 
 def get_csv_env(name, default=""):
@@ -52,6 +56,7 @@ CORS_ALLOWED_ORIGINS = get_csv_env(
         "http://127.0.0.1:5173"
     ),
 )
+CORS_ALLOW_HEADERS = [*default_headers, "idempotency-key"]
 
 CSRF_TRUSTED_ORIGINS = get_csv_env("CSRF_TRUSTED_ORIGINS")
 
@@ -270,6 +275,7 @@ REST_FRAMEWORK = {
         "LOCKER_QR_SCAN_THROTTLE_RATE",
         "30/minute",
     ),
+    "ai_operations": os.getenv("AI_OPERATIONS_THROTTLE_RATE", "5/minute"),
   },
   "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }

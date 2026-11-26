@@ -17,6 +17,7 @@ from .views import (
     AdminLockerDeviceListAPIView,
     AdminDashboardSummaryAPIView,
     AdminLockerDeviceActivationAPIView,
+    AdminOperationsAssistantAPIView,
 )
 
 
@@ -98,6 +99,11 @@ urlpatterns = [
     "admin/devices/<int:device_id>/activation/",
     AdminLockerDeviceActivationAPIView.as_view(),
     name="admin-locker-device-activation",
+    ),
+    path(
+        "admin/operations-assistant/",
+        AdminOperationsAssistantAPIView.as_view(),
+        name="admin-operations-assistant",
     ),
                                       
 ]

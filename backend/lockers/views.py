@@ -1,6 +1,7 @@
 import math
+from datetime import timedelta
 
-from django.db.models import Count, Q
+from django.db.models import Count, Exists, OuterRef, Q
 from .services import (
     create_drawer,
     update_drawer_maintenance_status,
@@ -35,6 +36,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.throttling import ScopedRateThrottle
 
 from accounts.permissions import IsAdminRole, IsCustomer, IsLockerDevice
 from orders.services import (
@@ -83,7 +85,35 @@ from .serializers import (
     LockerDeviceActivationSerializer,
     NearbyLockerQuerySerializer,
     NearbyLockerSerializer,
+    OperationsAssistantRequestSerializer,
+    OperationsAssistantResponseSerializer,
 )
+from .operations_assistant import (
+    OperationsAssistantError,
+    ask_operations_assistant,
+)
+
+
+class AdminOperationsAssistantAPIView(APIView):
+    permission_classes = [IsAdminRole]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "ai_operations"
+
+    @extend_schema(
+        tags=["AI Operations"],
+        request=OperationsAssistantRequestSerializer,
+        responses={200: OperationsAssistantResponseSerializer},
+    )
+    def post(self, request):
+        serializer = OperationsAssistantRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            result = ask_operations_assistant(serializer.validated_data["question"])
+        except OperationsAssistantError as error:
+            return Response({"detail": str(error)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        except ValueError as error:
+            return Response({"detail": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(result, status=status.HTTP_200_OK)
 
 
 class NearbyLockerStationAPIView(APIView):
@@ -129,7 +159,14 @@ class NearbyLockerStationAPIView(APIView):
                         drawers__status=Drawer.Status.AVAILABLE,
                         drawers__size__in=compatible_sizes,
                     ),
-                )
+                ),
+                device_ready=Exists(
+                    LockerDevice.objects.filter(
+                        locker_station_id=OuterRef("pk"),
+                        is_active=True,
+                        last_heartbeat_at__gte=timezone.now() - timedelta(minutes=2),
+                    )
+                ),
             )
             .filter(available_drawers_count__gt=0)
         )
@@ -146,8 +183,45 @@ class NearbyLockerStationAPIView(APIView):
                     float(station.longitude),
                 )
 
+        max_distance = max(
+            (station.distance_km or 0 for station in stations), default=0
+        )
+        max_capacity = max(
+            (station.available_drawers_count for station in stations), default=1
+        )
+        for station in stations:
+            if latitude is None:
+                proximity_score = 50  # Neutral when the customer shares no location.
+            elif max_distance == 0:
+                proximity_score = 100
+            else:
+                proximity_score = round(
+                    100 * (1 - (station.distance_km or 0) / max_distance)
+                )
+            capacity_score = round(
+                100 * station.available_drawers_count / max_capacity
+            )
+            device_score = 100 if station.device_ready else 0
+            station.recommendation_score = round(
+                proximity_score * 0.5 + capacity_score * 0.3 + device_score * 0.2
+            )
+            station.recommendation_reasons = []
+            if station.distance_km is not None:
+                station.recommendation_reasons.append(
+                    f"{station.distance_km:.1f} km from your location"
+                )
+            station.recommendation_reasons.append(
+                f"{station.available_drawers_count} compatible free drawer(s)"
+            )
+            station.recommendation_reasons.append(
+                "Locker device recently checked in"
+                if station.device_ready
+                else "Locker device has no recent heartbeat; access readiness is unconfirmed"
+            )
+
         stations.sort(
             key=lambda station: (
+                -station.recommendation_score,
                 station.distance_km is None,
                 station.distance_km if station.distance_km is not None else 0,
                 station.name.lower(),

@@ -13,6 +13,11 @@ SmartDrop is a full-stack delivery and smart-locker project. Customers place ord
 - Flutter customer and courier mobile experiences.
 - Redis and Celery for background and scheduled work.
 - Docker Compose for the local backend services.
+- A competition-branch locker simulator that exercises the authenticated locker-device API without physical hardware.
+
+## Competition demo
+
+The separate `feat/global-ai-builders-challenge` branch contains event-specific work. Checkout ranks eligible lockers with an explainable prototype heuristic; the admin dashboard includes **Locker simulator** and **Operations assistant** pages. The simulator shows drawer movement visually while the backend handles device authentication, heartbeat, deposit confirmation, one-time QR validation, and collection confirmation. It does not control physical hardware. The assistant uses Gemini function calling to query read-only operational tools; set `GEMINI_API_KEY` in the backend environment before using it. Never put that key in frontend configuration or commit it. See [the event demo guide](docs/ai-builders-challenge.md) for setup, privacy notes, and the walkthrough.
 
 ## Architecture
 
