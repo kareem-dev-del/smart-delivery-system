@@ -247,6 +247,19 @@ class _BottomActions extends StatelessWidget {
 
     final buttons = <Widget>[];
 
+    buttons.add(
+      Expanded(
+        child: OutlinedButton.icon(
+          onPressed: () => Navigator.of(context).pushNamed(
+            AppRoutes.trackOrder,
+            arguments: order.id,
+          ),
+          icon: const Icon(Icons.local_shipping_outlined),
+          label: const Text('Track order'),
+        ),
+      ),
+    );
+
     if (order.isCancellable) {
       buttons.add(
         Expanded(

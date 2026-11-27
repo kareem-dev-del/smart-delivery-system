@@ -9,4 +9,7 @@ class TrackOrderRepository {
 
   Future<OrderTracking> fetchTracking(String orderId) =>
       _trackOrderService.fetchTracking(orderId);
+
+  Future<Map<String, dynamic>> generatePickupQr(String orderId) =>
+      _trackOrderService.generatePickupQr(orderId);
 }

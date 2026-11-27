@@ -12,6 +12,24 @@ class TrackOrderCubit extends Cubit<TrackOrderState> {
   final TrackOrderController trackOrderController;
   bool _isLoadingTracking = false;
 
+  Future<void> generatePickupQr(String orderId) async {
+    if (state.isGeneratingPickupQr) return;
+    emit(state.copyWith(isGeneratingPickupQr: true, clearPickupQrError: true));
+    try {
+      final qr = await trackOrderController.generatePickupQr(orderId);
+      emit(state.copyWith(
+        pickupQrToken: qr['token'] as String?,
+        pickupQrExpiresAt: qr['expires_at'] as String?,
+        isGeneratingPickupQr: false,
+      ));
+    } catch (e) {
+      emit(state.copyWith(
+        isGeneratingPickupQr: false,
+        pickupQrError: e.toString().replaceFirst('Exception: ', ''),
+      ));
+    }
+  }
+
   Future<void> loadTracking(String orderId, {bool silent = false}) async {
     if (_isLoadingTracking) return;
     _isLoadingTracking = true;

@@ -5,7 +5,7 @@ class AppConfig {
   // at launch for a physical device or another environment.
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:8000',
+    defaultValue: 'http://10.0.2.2:8010',
   );
 
   static const String loginPath = '/api/token/';

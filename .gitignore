@@ -23,6 +23,8 @@ logs/
 
 # IDEs
 .vscode/
+!frontend/customer-app/.vscode/
+!frontend/customer-app/.vscode/launch.json
 .idea/
 
 # OS

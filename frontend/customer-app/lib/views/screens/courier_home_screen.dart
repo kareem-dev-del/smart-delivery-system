@@ -743,10 +743,28 @@ class _CourierOrderDetailsSheet extends StatelessWidget {
                 _WorkflowStep(
                   title: 'Locker confirmation',
                   subtitle:
-                      'The locker device confirms deposit and updates the order.',
+                      'After you arrive, the locker device confirms the parcel deposit and updates the order.',
                   isComplete: false,
                   isLast: true,
                 ),
+              if (!isReturn) ...[
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: colors.primary.withValues(alpha: 0.07),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    'Demo handoff: the dashboard Locker simulator represents the locker device and confirms the deposit. Drawer movement is simulated.',
+                    style: TextStyle(
+                      color: colors.foreground,
+                      fontSize: 12.5,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
     );

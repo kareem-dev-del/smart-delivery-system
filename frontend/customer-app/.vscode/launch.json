@@ -1,0 +1,14 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "ShopEase on Android Emulator (local API)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "toolArgs": [
+        "--dart-define=API_BASE_URL=http://10.0.2.2:8010"
+      ]
+    }
+  ]
+}

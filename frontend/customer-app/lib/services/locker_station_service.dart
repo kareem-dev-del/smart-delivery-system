@@ -49,10 +49,18 @@ class LockerStationService {
         return null;
       }
 
-      return Geolocator.getCurrentPosition(
+      final lastKnown = await Geolocator.getLastKnownPosition();
+      if (lastKnown != null &&
+          lastKnown.timestamp.isAfter(
+            DateTime.now().subtract(const Duration(minutes: 5)),
+          )) {
+        return lastKnown;
+      }
+
+      return await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.low,
-          timeLimit: Duration(seconds: 10),
+          timeLimit: Duration(seconds: 5),
         ),
       );
     } catch (_) {

@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter/services.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shopease_mobile/core/dependency_injection/di.dart';
 import 'package:shopease_mobile/core/theme/app_theme.dart';
 import 'package:shopease_mobile/core/utils/date_formatter.dart';
@@ -217,6 +219,15 @@ class _TrackOrderViewState extends State<_TrackOrderView> {
                       ],
                     ),
                   ),
+                if (tracking.status == 'ready_for_pickup') ...[
+                  const SizedBox(height: 20),
+                  _PickupQrCard(
+                    state: state,
+                    onGenerate: () => context
+                        .read<TrackOrderCubit>()
+                        .generatePickupQr(widget.orderId),
+                  ),
+                ],
               ],
             ),
           );
@@ -239,7 +250,7 @@ class _TrackOrderViewState extends State<_TrackOrderView> {
   String _statusDescription(String status) => switch (status) {
     'awaiting_locker' => 'We are preparing your order for a locker station.',
     'assigned' =>
-      'Your order is assigned and awaiting delivery to the station.',
+      'Your order is awaiting delivery to the locker. The pickup QR will appear here once it is deposited.',
     'ready_for_pickup' => 'Your order is waiting at the station shown below.',
     'collected' => 'Your order has been picked up successfully.',
     'expired' => 'The pickup period ended. The order is being returned.',
@@ -247,6 +258,97 @@ class _TrackOrderViewState extends State<_TrackOrderView> {
     'returned' => 'The order was returned to the locker station.',
     _ => 'Here are the latest updates for your order.',
   };
+}
+
+class _PickupQrCard extends StatelessWidget {
+  const _PickupQrCard({required this.state, required this.onGenerate});
+
+  final TrackOrderState state;
+  final VoidCallback onGenerate;
+
+  @override
+  Widget build(BuildContext context) {
+    final token = state.pickupQrToken;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: context.colors.card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: context.colors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Pickup QR code',
+            style: TextStyle(
+              color: context.colors.foreground,
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            token == null
+                ? 'Generate a one-time QR code when you are at the locker.'
+                : 'Show this code at the locker. It expires at ${DateFormatter.dateTime(state.pickupQrExpiresAt)}.',
+            style: TextStyle(
+              color: context.colors.mutedForeground,
+              fontSize: 13,
+            ),
+          ),
+          if (state.pickupQrError != null) ...[
+            const SizedBox(height: 10),
+            Text(state.pickupQrError!, style: const TextStyle(color: Colors.red)),
+          ],
+          if (token != null) ...[
+            const SizedBox(height: 14),
+            Center(
+              child: Container(
+                color: Colors.white,
+                padding: const EdgeInsets.all(12),
+                child: QrImageView(data: token, size: 220),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SelectableText(
+              token,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: context.colors.mutedForeground,
+                fontSize: 11,
+              ),
+            ),
+            TextButton.icon(
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: token));
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Pickup token copied')),
+                  );
+                }
+              },
+              icon: const Icon(Icons.copy),
+              label: const Text('Copy token for simulator'),
+            ),
+          ],
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: state.isGeneratingPickupQr ? null : onGenerate,
+            icon:
+                state.isGeneratingPickupQr
+                    ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                    : const Icon(Icons.qr_code_2),
+            label: Text(token == null ? 'Generate pickup QR' : 'Generate new QR'),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _InfoRow extends StatelessWidget {

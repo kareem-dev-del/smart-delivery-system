@@ -16,16 +16,18 @@ The admin dashboard now has a locker simulator page for demonstrating the existi
 
 Drawer movement is visual only. The backend remains responsible for device authorization, locker/order matching, QR validity, idempotency, drawer state, order state, event history, and customer notification. The simulator must be described as a hardware simulation in the submission and demo.
 
-## Run the dashboard simulator
+## Record the complete demo journey
 
-1. Start the backend and admin dashboard using the project's local setup instructions.
-2. Sign in to the admin dashboard.
-3. Ensure an online locker station has an active provisioned device and at least one drawer.
-4. Create a customer order and assign it to that station and a suitable drawer. The order should be in `assigned` status for the deposit step.
-5. Open **Locker simulator** from the dashboard navigation. Enter the device username and initial password shown during device provisioning. The password is used only for sign-in; the page keeps the access token in memory and does not persist it.
-6. Select the assigned order and run **Simulate courier deposit**. The API changes it to ready for pickup and issues the normal customer notification.
-7. In the customer app, open the order and generate its pickup QR. Paste the one-time token into the simulator and scan it. The API validates the token for this device and station and returns the authorized drawer.
-8. Confirm the simulated drawer close. The API records collection and updates the order.
+1. Start the backend and admin dashboard using the project's local setup instructions. Confirm that the online demo station has an active device and a compatible available drawer.
+2. In the customer app, sign in as `demo-customer`, add a product to the cart, choose the demo locker at checkout, and place the order. Checkout reserves a compatible drawer and creates an `assigned` order.
+3. In the customer app, sign out and sign in as `demo-courier`. Open **Courier hub**, start the shift, and leave the hub open so the task can refresh.
+4. In the admin dashboard, open **Orders**, open the new order, choose the on-shift demo courier under **Courier assignment**, and save. The courier task appears in **My deliveries**; opening it shows the locker address, drawer, parcel contents, and directions.
+5. In the customer app, sign out of the courier account and return to `demo-customer`. Open **My Orders**, tap the order, and use **Track order** to show its assigned state.
+6. In the dashboard, open **Locker simulator** and connect with the provisioned device account. Select the order and run **Simulate courier deposit**. This represents the courier placing the parcel into the assigned drawer; the authenticated device API changes the order to `ready_for_pickup` and creates the customer notification.
+7. Return to the customer app's tracking page. Refresh if needed, press **Generate pickup QR**, and show the one-time code. It expires after ten minutes. For the browser simulator, copy its token and paste it into **Customer pickup QR token**.
+8. In the simulator, scan the token and confirm the simulated drawer close. The backend validates the token, records collection, releases the drawer, and changes the order to `collected`. The tracking page refreshes automatically; refresh the admin Orders page to show the final state.
+
+The customer app routes to **Courier hub** automatically when a courier account signs in. There is no separate courier web page. The courier app shows the assigned task and destination; the locker simulator represents the device confirmation because no physical locker is connected. Never describe drawer motion as real hardware operation.
 
 The simulator requires an administrator session to list eligible orders and a provisioned device account to perform device operations. Invalid, expired, reused, or wrong-station QR tokens should be rejected by the backend. The simulator does not operate a physical lock, sensor, keypad, or network controller.
 
@@ -88,11 +90,13 @@ The operations assistant can summarize order workload, inspect station capacity,
 | Time | Show and say |
 | --- | --- |
 | 0:00–0:20 | State the customer and operations problem: delivery handoffs are hard to coordinate and collection status is unclear. |
-| 0:20–0:45 | Show the existing SmartDrop customer checkout and clearly point out the event-added locker ranking and its distance, capacity, score, and device-readiness explanation. |
-| 0:45–1:20 | Ask the operations assistant a capacity or order-status question. Show Gemini's answer beside the actual tool evidence. |
-| 1:20–2:20 | Walk through the locker simulator: device heartbeat, courier deposit, customer pickup QR authorization, and collection confirmation. Show the order reaching `collected`. State that drawer motion is simulated. |
-| 2:20–2:40 | Show a rejected invalid QR and an unknown order query. Explain how the system handles each. |
-| 2:40–3:00 | Recap what was built during the event, distinguish Gemini from the rules-based ranking, and disclose the hardware simulation and free-tier data limitation. |
+| 0:00–0:20 | Introduce the delivery coordination problem and SmartDrop. |
+| 0:20–0:45 | Place a customer order and show the eligible locker recommendation. |
+| 0:45–1:10 | Assign the on-shift courier in the dashboard, then show the order in Courier hub with the station and drawer. |
+| 1:10–1:35 | Use Locker simulator to confirm deposit; show the customer's tracking status change to ready for pickup. State that drawer motion is simulated. |
+| 1:35–2:05 | Generate the customer pickup QR, authorize it in the simulator, and confirm collection. Show `collected`. |
+| 2:05–2:40 | Ask Gemini a live operational question and show the evidence cards. |
+| 2:40–3:00 | Recap the new features and disclose the rules-based recommendation and simulated hardware. |
 
 Record only after rebuilding the latest mobile UI and confirming the location result and device-readiness line on the exact demo setup. Keep the API key out of screen recordings, source code, browser network screenshots, and the Devpost page.
 

@@ -28,6 +28,7 @@ import {
   type ProductSize,
 } from "../api/products";
 import { useAuth } from "../auth/AuthProvider";
+import { API_BASE_URL, ApiRequestError } from "../api/client";
 import { formatDate, formatLabel } from "../lib/format";
 import { useLocale } from "../i18n/LocaleProvider";
 import { StyledSelect } from "../components/StyledSelect";
@@ -46,6 +47,28 @@ const EMPTY_FORM: ProductInput = {
   size: "small",
   is_active: true,
 };
+
+function productImageUrl(image: string | null | undefined): string {
+  if (!image) return "";
+  if (/^https?:\/\//i.test(image)) return image;
+  return `${API_BASE_URL}${image.startsWith("/") ? "" : "/"}${image}`;
+}
+
+function productErrorMessage(error: unknown): string {
+  if (error instanceof ApiRequestError) {
+    const messages: string[] = [];
+    const collect = (value: unknown) => {
+      if (typeof value === "string" && value.trim()) messages.push(value.trim());
+      else if (Array.isArray(value)) value.forEach(collect);
+      else if (value && typeof value === "object") {
+        Object.values(value as Record<string, unknown>).forEach(collect);
+      }
+    };
+    collect(error.details);
+    if (messages.length) return messages.join(" ");
+  }
+  return error instanceof Error ? error.message : "Could not save this product.";
+}
 
 function formatMoney(value: string): string {
   const amount = Number(value);
@@ -190,6 +213,12 @@ export function ProductsPage() {
       setError("Product image must be 5 MB or smaller.");
       return;
     }
+    const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+    const allowedExtension = /\.(jpe?g|png|webp)$/i.test(file.name);
+    if ((file.type && !allowedTypes.has(file.type)) || (!file.type && !allowedExtension)) {
+      setError("Choose a JPEG, PNG, or WebP product image.");
+      return;
+    }
     setForm((current) => ({ ...current, image: file, clear_image: false }));
     setError(null);
   }
@@ -246,11 +275,7 @@ export function ProductsPage() {
       setNotice(locale === "ar" ? (editingProduct ? "تم حفظ تغييرات المنتج." : "تم إنشاء المنتج.") : (editingProduct ? "Product changes saved." : "Product created."));
       closeForm();
     } catch (caughtError) {
-      setError(
-        caughtError instanceof Error
-          ? caughtError.message
-          : "Could not save this product.",
-      );
+      setError(productErrorMessage(caughtError));
     } finally {
       setSaving(false);
     }
@@ -383,7 +408,7 @@ export function ProductsPage() {
               >
                 <div className="product-image-preview">
                   {imagePreview || (editingProduct?.image && !form.clear_image) ? (
-                    <img src={imagePreview || editingProduct?.image || ""} alt={t("Product preview")} />
+                    <img src={imagePreview || productImageUrl(editingProduct?.image)} alt={t("Product preview")} />
                   ) : <Package size={25} aria-hidden="true" />}
                 </div>
                 <div className="product-image-inputs">
@@ -493,7 +518,7 @@ export function ProductsPage() {
               <tbody>
                 {visibleProducts.map((product) => (
                   <tr key={product.id}>
-                    <td><div className="product-name-cell"><span className="product-row-icon">{product.image ? <img src={product.image} alt="" /> : <Package size={17} />}</span><span><strong>{product.name}</strong><small>{product.description || t("No description")}</small></span></div></td>
+                    <td><div className="product-name-cell"><span className="product-row-icon">{product.image ? <img src={productImageUrl(product.image)} alt="" /> : <Package size={17} />}</span><span><strong>{product.name}</strong><small>{product.description || t("No description")}</small></span></div></td>
                     <td>{product.category_name || <span className="category-unassigned">{t("Uncategorized")}</span>}</td>
                     <td className="product-price-cell">{formatMoney(product.price)}</td>
                     <td><span className={product.stock <= 5 ? "product-stock-low" : "product-stock"}>{product.stock} {t("units")}</span></td>
